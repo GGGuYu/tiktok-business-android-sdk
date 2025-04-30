@@ -18,10 +18,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Switch;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -63,6 +63,7 @@ public class InitFragment extends Fragment {
         ((Switch)(root.findViewById(R.id.limited_status))).setChecked(InitViewModel.lduModeSwitch);
         ((Switch)(root.findViewById(R.id.iap_status))).setChecked(InitViewModel.autoIapTrack);
         ((Switch)(root.findViewById(R.id.init_with_callback))).setChecked(InitViewModel.initWithCallback);
+        ((WebView)(root.findViewById(R.id.webview))).loadUrl("https://business-api.tiktok.com/portal");
         init.setOnClickListener(v -> {
             HomeViewModel homeViewModel = new ViewModelProvider(this).get(HomeViewModel.class);
 
@@ -167,15 +168,16 @@ public class InitFragment extends Fragment {
                     InitViewModel.initWithCallback = false;
                 }
                 if(appId.getText().toString() == null || appId.getText().toString().isEmpty()){
-                    ttConfig.setAppId("com.tiktok.iabtest");
+                    ttConfig.setAppId("com.zhiliaoapp.musically");
                 } else {
                     ttConfig.setAppId(appId.getText().toString());
                 }
                 if(ttAppId.getText().toString() == null || ttAppId.getText().toString().isEmpty()){
-                    ttConfig.setTTAppId("123456");
+                    ttConfig.setTTAppId("7351070180723720194");
                 } else {
                     ttConfig.setTTAppId(ttAppId.getText().toString());
                 }
+                //ttConfig.disableAutoEnhancedDataPostbackEvent();
                 Log.e("Initialization state", TikTokBusinessSdk.isInitialized()+"");
                 if(InitViewModel.initWithCallback){
                     TikTokBusinessSdk.initializeSdk(ttConfig, new TikTokBusinessSdk.TTInitCallback() {
