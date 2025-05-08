@@ -180,24 +180,33 @@ public class SystemInfoUtil {
                 @Override
                 public void onInstallReferrerSetupFinished(int responseCode) {
                     try {
-                        switch (responseCode) {
-                            case InstallReferrerClient.InstallReferrerResponse.OK:
-                                try {
-                                    ReferrerDetails response = referrerClient.getInstallReferrer();
-                                    String referrerUrl = response.getInstallReferrer();
-                                    long referrerClickTime = response.getReferrerClickTimestampSeconds();
-                                    long appInstallTime = response.getInstallBeginTimestampSeconds();
-                                    referrerInfo = new ReferrerInfo(referrerUrl, appInstallTime, referrerClickTime);
-                                } catch (Throwable e) {
+                        TTHandlerUtil.getInstance().post(new Runnable() {
+                            @Override
+                            public void run() {
+                                try{
+                                    switch (responseCode) {
+                                        case InstallReferrerClient.InstallReferrerResponse.OK:
+                                            try {
+                                                ReferrerDetails response = referrerClient.getInstallReferrer();
+                                                String referrerUrl = response.getInstallReferrer();
+                                                long referrerClickTime = response.getReferrerClickTimestampSeconds();
+                                                long appInstallTime = response.getInstallBeginTimestampSeconds();
+                                                referrerInfo = new ReferrerInfo(referrerUrl, appInstallTime, referrerClickTime);
+                                            } catch (Throwable e) {
+
+                                            }
+                                            break;
+                                        case InstallReferrerClient.InstallReferrerResponse.FEATURE_NOT_SUPPORTED:
+                                            break;
+                                        case InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE:
+                                            break;
+                                    }
+                                    referrerClient.endConnection();
+                                }catch (Throwable throwable){
 
                                 }
-                                break;
-                            case InstallReferrerClient.InstallReferrerResponse.FEATURE_NOT_SUPPORTED:
-                                break;
-                            case InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE:
-                                break;
-                        }
-                        referrerClient.endConnection();
+                            }
+                        });
                     }catch (Throwable throwable){
 
                     }

@@ -28,6 +28,7 @@ public enum EventName {
     SPEND_CREDITS("SpendCredits"),
     START_TRIAL("StartTrial"),
     SUBSCRIBE("Subscribe"),
+    IMPRESSION_LEVEL_AD_REVENUE("ImpressionLevelAdRevenue"),
     UNLOCK_ACHIEVEMENT("UnlockAchievement");
     private String eventName;
 
