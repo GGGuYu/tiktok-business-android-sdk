@@ -32,6 +32,11 @@ import com.example.R;
 import com.example.ui.home.HomeViewModel;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.appevents.ErrorData;
+import com.tiktok.appevents.base.TTAdRevenueEvent;
+import com.tiktok.appevents.base.TTBaseEvent;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class InitFragment extends Fragment {
 
@@ -183,6 +188,9 @@ public class InitFragment extends Fragment {
                     TikTokBusinessSdk.initializeSdk(ttConfig, new TikTokBusinessSdk.TTInitCallback() {
                         @Override
                         public void success() {
+                            JSONObject adRevenueJson = new JSONObject();
+                            TTBaseEvent adRevenueInfo = TTAdRevenueEvent.newBuilder(adRevenueJson).build();
+                            TikTokBusinessSdk.trackTTEvent(adRevenueInfo);
                             WebSettings.getDefaultUserAgent(TikTokBusinessSdk.getApplicationContext());
                             TikTokBusinessSdk.fetchDeferredDeeplinkWithCompletion(new TikTokBusinessSdk.FetchDeferredDeeplinkCompletion() {
                                 @Override
