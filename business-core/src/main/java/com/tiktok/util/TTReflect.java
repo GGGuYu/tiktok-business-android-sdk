@@ -1,11 +1,13 @@
 package com.tiktok.util;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class TTReflect {
 
     private Class<?> mClass;
     private Method mMethod;
+    private Field mField;
 
     public static TTReflect on(String className) {
         TTReflect reflect = new TTReflect();
@@ -25,9 +27,26 @@ public final class TTReflect {
     private TTReflect() {
     }
 
+    public TTReflect findField(String fieldName) {
+        try {
+            mField = mClass.getDeclaredField(fieldName);
+        } catch (Throwable ignore) {
+        }
+        return this;
+    }
+
+    public Object getValue(Object receiver) {
+        try {
+            mField.setAccessible(true);
+            return mField.get(receiver);
+        } catch (Throwable ignore) {
+        }
+        return null;
+    }
+
     public TTReflect findMethod(String methodName, Class<?>... parameterTypes) {
         try {
-            mMethod = mClass.getMethod(methodName, parameterTypes);
+            mMethod = mClass.getDeclaredMethod(methodName, parameterTypes);
         } catch (Throwable ignore) {
         }
         return this;
@@ -35,6 +54,7 @@ public final class TTReflect {
 
     public Object call(Object receiver, Object... args) {
         try {
+            mMethod.setAccessible(true);
             return mMethod.invoke(receiver, args);
         } catch (Throwable ignore) {
         }
