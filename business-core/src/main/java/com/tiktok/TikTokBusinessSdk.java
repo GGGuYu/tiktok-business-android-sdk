@@ -764,7 +764,7 @@ public class TikTokBusinessSdk {
         /* open LDU mode*/
         private boolean lduModeSwitch = false;
 
-        private boolean autoIapTrack = false;
+        private boolean autoIapTrack = true;
         /* to enable auto EDP event tracking */
         private boolean autoEDPEvent = true;
 
@@ -950,7 +950,7 @@ public class TikTokBusinessSdk {
     }
 
     public static boolean enableAutoIapTrack() {
-        return config != null && config.isAutoIapTrack();
+        return config == null || config.isAutoIapTrack();
     }
 
     public interface CrashListener {
