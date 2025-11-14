@@ -17,7 +17,11 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.tiktok.appevents.*;
+import com.tiktok.appevents.ErrorData;
+import com.tiktok.appevents.TTAppEventLogger;
+import com.tiktok.appevents.TTCrashHandler;
+import com.tiktok.appevents.TTPurchaseInfo;
+import com.tiktok.appevents.TTUserInfo;
 import com.tiktok.appevents.base.EventName;
 import com.tiktok.appevents.base.TTBaseEvent;
 import com.tiktok.appevents.edp.TTActivityLifecycleCallbacks;
@@ -25,12 +29,16 @@ import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.util.RegexUtil;
 import com.tiktok.util.TTConst;
 import com.tiktok.util.TTLogger;
-
 import com.tiktok.util.TTUtil;
+
 import org.json.JSONObject;
 
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TikTokBusinessSdk {
@@ -204,9 +212,9 @@ public class TikTokBusinessSdk {
         appEventLogger = new TTAppEventLogger(ttConfig.autoEvent,ttConfig.disabledEvents,
                 ttConfig.flushTime, ttConfig.disableMetrics);
         appEventLogger.initConfig(initTimeMS, callback, sdkInitialized);
-        try{
-            TTInAppPurchaseWrapper.registerIapTrack(config.autoIapTrack);
-        }catch (Throwable ignored) {}
+
+        //register iap track
+        TTInAppPurchaseWrapper.registerIapTrack();
 
         try {
             long endTimeMS = System.currentTimeMillis();
@@ -910,7 +918,7 @@ public class TikTokBusinessSdk {
             debugModeSwitch = true;
             return this;
         }
-      
+
         /**
          * to open the LDU(limited data use)mode
          */

@@ -9,16 +9,14 @@ package com.tiktok.appevents;
 import static com.tiktok.TikTokBusinessSdk.INVALID_ID;
 import static com.tiktok.appevents.ErrorData.TT_DDL_CODE_HTTP_ERROR;
 import static com.tiktok.appevents.ErrorData.TT_DDL_MSG_HTTP_ERROR;
-import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.ENABLE_SDK;
 import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.EDP_NATIVE_SDK_CONFIG;
-import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.EDP_UNITY_SDK_CONFIG;
+import static com.tiktok.appevents.edp.TTEDPEventTrack.trackFirstAppLaunch;
 import static com.tiktok.util.TTConst.ERROR_MESSAGE_INVALID_ID;
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
-import static com.tiktok.appevents.edp.TTEDPEventTrack.trackFirstAppLaunch;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -28,15 +26,18 @@ import androidx.lifecycle.ProcessLifecycleOwner;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.appevents.edp.EDPConfig;
 import com.tiktok.appevents.edp.TTEDPEventTrack;
+import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.unity.TTUnityBridge;
-import com.tiktok.util.*;
+import com.tiktok.util.SystemInfoUtil;
+import com.tiktok.util.TTConst;
+import com.tiktok.util.TTHandlerUtil;
+import com.tiktok.util.TTLogger;
+import com.tiktok.util.TTUtil;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -72,8 +73,7 @@ public class TTAppEventLogger {
 
     // for internal debug purpose
     int flushId = 0;
-    public static boolean autoTrackRetentionEnable = true;
-    public static boolean autoTrackPaymentEnable = true;
+    public static volatile boolean autoTrackRetentionEnable = true;
 
     // similar to what javascript has, so that all the internal tasks are executed in a waterfall fashion, avoiding race conditions
     static ScheduledExecutorService eventLoop = Executors.newSingleThreadScheduledExecutor(new TTThreadFactory());
@@ -561,7 +561,7 @@ public class TTAppEventLogger {
                 logger.debug("available_version=" + availableVersion);
                 TikTokBusinessSdk.setGlobalConfigFetched();
                 autoTrackRetentionEnable = businessSdkConfig.optBoolean("auto_track_Retention_enable");
-                autoTrackPaymentEnable = businessSdkConfig.optBoolean("auto_track_Payment_enable");
+                TTInAppPurchaseWrapper.updateConfig(businessSdkConfig);
                 TTUnityBridge.setConfigCallback(requestResult);
                 EDPConfig.optConfig(businessSdkConfig.optJSONObject(EDP_NATIVE_SDK_CONFIG));
             } catch (JSONException e) {

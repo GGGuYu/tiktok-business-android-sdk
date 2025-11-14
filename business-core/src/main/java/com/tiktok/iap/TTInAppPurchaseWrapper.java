@@ -6,178 +6,131 @@
 
 package com.tiktok.iap;
 
-import static com.tiktok.TikTokBusinessSdk.getApplicationContext;
-import static com.tiktok.appevents.edp.EDPConfig.enable_pay_show_track;
-import static com.tiktok.appevents.TTAppEventLogger.autoTrackPaymentEnable;
+import android.app.Activity;
 
-import android.content.Context;
-
-import androidx.annotation.NonNull;
-
-import com.android.billingclient.api.BillingClient;
-import com.android.billingclient.api.BillingClientStateListener;
-import com.android.billingclient.api.BillingResult;
-import com.android.billingclient.api.Purchase;
-import com.android.billingclient.api.PurchasesUpdatedListener;
-import com.android.billingclient.api.SkuDetails;
-import com.android.billingclient.api.SkuDetailsParams;
 import com.tiktok.TikTokBusinessSdk;
-import com.tiktok.appevents.TTPurchaseInfo;
-import com.tiktok.appevents.edp.TTEDPEventTrack;
-import com.tiktok.util.TTLogger;
+import com.tiktok.iap.billing.client.IBillingProxy;
+import com.tiktok.iap.billing.client.TTBillingFactory;
+import com.tiktok.util.JSON;
+import com.tiktok.util.TTSafeRunnable;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class TTInAppPurchaseWrapper {
+    public static final ExecutorService sExecutor = Executors.newSingleThreadExecutor();
+    public static volatile boolean autoTrackPaymentEnable = true;
+    public static Set<Integer> autoTrackPaymentTypes = new CopyOnWriteArraySet<>();
+    public static volatile boolean autoTrackPaymentJson = true;
+    public static volatile boolean autoTrackPaymentHistory = true;
+    public static volatile int autoTrackPaymentHistoryINAPP = 200;
+    public static volatile int autoTrackPaymentHistorySUBS = 20;
 
-    private static Context mContext;
-    private static BillingClient mBillingClient;
-    static final String TAG = TTInAppPurchaseWrapper.class.getName();
+    private static volatile IBillingProxy sBillingProxy;
 
-    private static final TTLogger ttLogger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
+    private static final String ACT_BILLING = "ProxyBillingActivity";
+    private static volatile String sPreviousActivity;
 
-    public static void registerIapTrack(boolean autoIapTrack) {
+    static {
+        autoTrackPaymentTypes.add(1); //INAPP
+        autoTrackPaymentTypes.add(2); //SUBS
+    }
+
+    public static void registerIapTrack() {
         try {
-            if (getApplicationContext() == null) {
-                return;
+            if (autoTrackPaymentEnable && TikTokBusinessSdk.enableAutoIapTrack()) {
+                sExecutor.submit(new TTSafeRunnable() {
+                    @Override
+                    public void doSafeRun() {
+                        final IBillingProxy proxy = getBillingProxy();
+                        if (proxy != null) {
+                            proxy.init();
+                        }
+                    }
+                });
             }
-            mContext = getApplicationContext();
-            PurchasesUpdatedListener purchaseUpdateListener = (billingResult, purchases) -> {
-                try {
-                    JSONArray skuInfo = new JSONArray();
-                    if(purchases != null) {
-                        for (Purchase purchase : purchases) {
-                            skuInfo.put(new JSONObject(purchase.getOriginalJson()));
-                        }
-                    }
-                    if(enable_pay_show_track) {
-                        TTEDPEventTrack.trackPayShow(billingResult.getResponseCode(), skuInfo);
-                    }
-                }catch (Throwable e) {
-                }
-                if(!autoIapTrack){
-                    return;
-                }
-                if (autoTrackPaymentEnable && billingResult != null && billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK
-                        && purchases != null) {
-                    for (Purchase purchase : purchases) {
-                        if (purchase == null) {
-                            continue;
-                        }
-                        List<String> skus = purchase.getSkus();
-                        if (skus == null || skus.size() == 0) {
-                            continue;
-                        }
-                        querySkuAndTrack(skus, purchase, true);
-                    }
-                } else if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.USER_CANCELED) {
-                    ttLogger.info("user canceled");
-                } else {
-                    ttLogger.info("otherErr : %s", billingResult.getDebugMessage());
-                }
-            };
-            mBillingClient = BillingClient.newBuilder(mContext)
-                    .setListener(purchaseUpdateListener)
-                    .enablePendingPurchases()
-                    .build();
-            startBillingClient();
         } catch (Throwable ignored) {
-            ttLogger.error(ignored, "register Iap track error");
         }
     }
 
-    public static void startBillingClient() {
+    public static void tryReportIapEvent(Activity activity) {
         try {
-            if (mBillingClient == null || mBillingClient.isReady()) {
+            if (activity == null) {
                 return;
             }
-            mBillingClient.startConnection(new BillingClientStateListener() {
-                @Override
-                public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
-                    if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
-                        ttLogger.info("billing setup finished");
-                    } else {
-                        ttLogger.info("billing setup error %s", billingResult.getDebugMessage());
-                    }
-                }
-
-                @Override
-                public void onBillingServiceDisconnected() {
-                    ttLogger.info("billing service disconnected");
-                }
-            });
-        } catch (Throwable ignored) {
-            ttLogger.error(ignored, "start billing client connection error");
-        }
-    }
-
-    private static void querySkuAndTrack(List<String> skus, Purchase purchase, boolean isInAppPurchase) {
-        try {
-            List<String> skuList = new ArrayList<>();
-            for (String sku : skus) {
-                if (sku == null || sku.isEmpty()) {
-                    continue;
-                }
-                skuList.add(sku);
-            }
-            SkuDetailsParams.Builder params = SkuDetailsParams.newBuilder();
-            if (isInAppPurchase) {
-                params.setSkusList(skuList).setType(BillingClient.SkuType.INAPP);
-            } else {
-                params.setSkusList(skuList).setType(BillingClient.SkuType.SUBS);
-            }
-            mBillingClient.querySkuDetailsAsync(params.build(), (billingResult, skuDetailsList) -> {
-                if (billingResult != null && billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK
-                        && skuDetailsList != null) {
-                    if (skuDetailsList.size() > 0) {
-                        List<TTPurchaseInfo> purchaseInfos = new ArrayList<>();
-                        try {
-                            for (SkuDetails skuDetails : skuDetailsList) {
-                                TTPurchaseInfo purchaseInfo = new TTPurchaseInfo(new JSONObject(purchase.getOriginalJson()),
-                                        new JSONObject(skuDetails.getOriginalJson()));
-                                purchaseInfo.setAutoTrack(true);
-                                purchaseInfos.add(purchaseInfo);
+            if (autoTrackPaymentEnable && autoTrackPaymentHistory) {
+                final String actName = activity.getClass().getSimpleName();
+                if (sPreviousActivity != null && sPreviousActivity.contains(ACT_BILLING)
+                        && !actName.contains(ACT_BILLING)) {
+                    sExecutor.submit(new TTSafeRunnable() {
+                        @Override
+                        public void doSafeRun() {
+                            final IBillingProxy proxy = getBillingProxy();
+                            if (proxy != null) {
+                                proxy.queryPurchaseHistory();
                             }
-                            TikTokBusinessSdk.trackGooglePlayPurchase(purchaseInfos);
-                        } catch (Throwable e) {
-                            ttLogger.error(e, "query Sku And Track google play purchase error");
                         }
-                    } else {
-                        if (isInAppPurchase) {
-                            querySkuAndTrack(skus, purchase, false);
-                        } else {
-                            sendNoSkuIapTrack(skus, purchase);
-                        }
-                    }
-                } else {
-                    sendNoSkuIapTrack(skus, purchase);
+                    });
                 }
-            });
+
+                sPreviousActivity = actName;
+            }
         } catch (Throwable ignored) {
-            ttLogger.error(ignored, "query Sku And Track error");
         }
     }
 
-    private static void sendNoSkuIapTrack(List<String> skus, Purchase purchase) {
+    public static void updateConfig(JSONObject config) {
         try {
-            JSONArray contents = new JSONArray();
-            for (String sku : skus) {
-                if (sku == null || sku.isEmpty()) {
-                    continue;
-                }
-                JSONObject item = new JSONObject()
-                        .put("quantity", purchase.getQuantity())
-                        .put("content_id", sku);
-                contents.put(item);
+            if (config == null) {
+                return;
             }
-            JSONObject content = new JSONObject().put("contents", contents);
-            TikTokBusinessSdk.trackEvent("Purchase", content);
-        } catch (Throwable ignored) {
-            ttLogger.error(ignored, "Track Purchase error");
+
+            autoTrackPaymentEnable = JSON.getBoolean(config, "auto_track_Payment_enable", true);
+            autoTrackPaymentJson = autoTrackPaymentEnable && JSON.getInt(config, "auto_track_Payment_json", 1) == 1;
+            autoTrackPaymentHistory = autoTrackPaymentEnable && JSON.getInt(config, "auto_track_Payment_history_enable", 1) == 1;
+            autoTrackPaymentHistoryINAPP = JSON.getInt(config, "auto_track_Payment_history_inapp_size", 200);
+            autoTrackPaymentHistorySUBS = JSON.getInt(config, "auto_track_Payment_history_subs_size", 20);
+
+            autoTrackPaymentTypes.clear();
+            JSONArray types = JSON.getJsonArray(config, "auto_track_Payment_types");
+            if (types != null) {
+                int count = types.length();
+                for (int i = 0; i < count; i++) {
+                    try {
+                        int type = types.optInt(i, -2);
+                        if (type > 0) {
+                            autoTrackPaymentTypes.add(type);
+                        }
+                    } catch (Throwable ignore) {
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
         }
     }
+
+    public static boolean canTrackINAPP() {
+        return autoTrackPaymentEnable && autoTrackPaymentTypes.contains(1);
+    }
+
+    public static boolean canTrackSUBS() {
+        return autoTrackPaymentEnable && autoTrackPaymentTypes.contains(2);
+    }
+
+    private static IBillingProxy getBillingProxy() {
+        if (sBillingProxy == null) {
+            synchronized (TTInAppPurchaseWrapper.class) {
+                if (sBillingProxy == null) {
+                    sBillingProxy = TTBillingFactory.createBillingProxy();
+                }
+            }
+        }
+        return sBillingProxy;
+    }
+
 }

@@ -1,4 +1,4 @@
-package com.tiktok.iap;
+package com.tiktok.iap.billing;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;

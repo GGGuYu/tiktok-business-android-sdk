@@ -18,10 +18,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.iap.TTInAppPurchaseWrapper;
 
 import java.lang.ref.WeakReference;
 
-public class TTActivityLifecycleCallbacks implements Application.ActivityLifecycleCallbacks{
+public class TTActivityLifecycleCallbacks implements Application.ActivityLifecycleCallbacks {
     private boolean mIsBackground = true;
 
     private int mRefCount = 0;
@@ -47,13 +48,14 @@ public class TTActivityLifecycleCallbacks implements Application.ActivityLifecyc
             registerEDPListener(activityWeakReference, index, mIsBackground);
         }
     }
+
     private void registerEDPListener(WeakReference<Activity> activity, int index, boolean isBackground) {
         try {
             activity.get().getWindow().getDecorView().post(new Runnable() {
                 @Override
                 public void run() {
                     if (enable_page_show_track) {
-                        if(TTEDPEventTrack.pageShowIsSending){
+                        if (TTEDPEventTrack.pageShowIsSending) {
                             return;
                         }
                         TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
@@ -64,7 +66,7 @@ public class TTActivityLifecycleCallbacks implements Application.ActivityLifecyc
                                     TTEDPEventTrack.trackPageShow(activity.get().getClass().getSimpleName(), index, isBackground,
                                             TTHierarchyHelper.getViewHierarchy(new WeakReference<>(activity.get().getWindow().getDecorView()), page_detail_upload_deep_count),
                                             TTHierarchyHelper.getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(activity.get().getWindow().getDecorView()), activity));
-                                }catch (Throwable e){
+                                } catch (Throwable e) {
 
                                 }
                             }
@@ -75,7 +77,7 @@ public class TTActivityLifecycleCallbacks implements Application.ActivityLifecyc
                             public void run() {
                                 try {
                                     TTHierarchyHelper.getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(activity.get().getWindow().getDecorView()), activity);
-                                }catch (Throwable e){
+                                } catch (Throwable e) {
 
                                 }
                             }
@@ -83,33 +85,36 @@ public class TTActivityLifecycleCallbacks implements Application.ActivityLifecyc
                     }
                 }
             });
-        }catch (Throwable e){
+        } catch (Throwable e) {
 
         }
     }
 
     @Override
     public void onActivityResumed(@NonNull Activity activity) {
-        if(activityWeakReference == null || activityWeakReference.get() == null || activityWeakReference.get() != activity){
+        if (activityWeakReference == null || activityWeakReference.get() == null || activityWeakReference.get() != activity) {
             index++;
         }
         activityWeakReference = new WeakReference<>(activity);
+
+        TTInAppPurchaseWrapper.tryReportIapEvent(activity);
+
         if (enable_app_launch_track && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 && mIsBackground && activity.getReferrer() != null) {
             TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         TTEDPEventTrack.trackAppLaunch(activityWeakReference.get().getReferrer().toString(),
                                 activityWeakReference.get().getIntent() != null && activityWeakReference.get().getIntent().getData() != null
                                         ? activityWeakReference.get().getIntent().getData().toString() : "");
-                    }catch (Throwable e){
+                    } catch (Throwable e) {
 
                     }
                 }
             });
         }
         final boolean isBackground = mIsBackground;
-        if(TikTokBusinessSdk.isInitialized()) {
+        if (TikTokBusinessSdk.isInitialized()) {
             hasSendPageShow = true;
             registerEDPListener(activityWeakReference, index, isBackground);
         }
