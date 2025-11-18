@@ -29,6 +29,7 @@ import com.tiktok.appevents.edp.TTEDPEventTrack;
 import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.unity.TTUnityBridge;
 import com.tiktok.util.JSON;
+import com.tiktok.util.NetworkTimeout;
 import com.tiktok.util.SystemInfoUtil;
 import com.tiktok.util.TTConst;
 import com.tiktok.util.TTHandlerUtil;
@@ -542,6 +543,8 @@ public class TTAppEventLogger {
                 String availableVersion = JSON.getString(businessSdkConfig, "available_version");
                 String trackEventDomain = JSON.getString(businessSdkConfig, "domain");
                 boolean enableDebugMode = JSON.getBoolean(businessSdkConfig, "enable_debug_mode", false);
+
+                NetworkTimeout.updateConfig(businessSdkConfig);
 
                 TikTokBusinessSdk.setSdkGlobalSwitch(enableSDK);
                 logger.debug("enable_sdk=" + enableSDK);

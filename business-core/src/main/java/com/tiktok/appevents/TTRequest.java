@@ -21,6 +21,7 @@ import com.tiktok.util.TTConst;
 import com.tiktok.util.TTLogger;
 import com.tiktok.util.TTUtil;
 import com.tiktok.util.TimeUtil;
+import com.tiktok.util.UrlConst;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -103,7 +104,8 @@ class TTRequest {
             logger.error(e, e.getMessage());
         }
 
-        String url = "https://analytics.us.tiktok.com/api/v1/app_sdk/cache/config";
+        String url = UrlConst.getConfigUrl();
+
         logger.debug(url);
         if (TextUtils.isEmpty(TikTokBusinessSdk.getTTAppId()) || TextUtils.isEmpty(TikTokBusinessSdk.getAppId())) {
             try {
@@ -194,7 +196,7 @@ class TTRequest {
         successfulRequests = 0;
         notifyChange();
         //  dynamic req domain and version
-        String url = "https://" + TikTokBusinessSdk.getApiTrackDomain() + "/api/v1/app_sdk/batch";
+        String url = UrlConst.getBatchUrl();
 
         List<TTAppEvent> failedEventsToBeSaved = new ArrayList<>();
         int failedEventsToBeDiscardedSize = 0;
@@ -363,13 +365,13 @@ class TTRequest {
     }
 
     public static String reportMonitorEvent(JSONObject stat) {
-        String url = "https://" + TikTokBusinessSdk.getApiTrackDomain() + "/api/v1/app_sdk/monitor";
+        String url = UrlConst.getMonitorUrl();
         return HttpRequestUtil.doPost(url, headParamMap, stat.toString());
     }
 
     public static String fetchDeferredDeeplinkWithCompletion() {
         JSONObject stat = TTRequestBuilder.ddlJson();
-        String url = "https://" + TikTokBusinessSdk.getApiTrackDomain() + "/api/v1/app_sdk/ddl";
+        String url = UrlConst.getDDLUrl();
         return HttpRequestUtil.doPost(url, headParamMap, stat.toString(), false);
     }
 }

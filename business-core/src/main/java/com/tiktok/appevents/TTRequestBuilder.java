@@ -129,7 +129,7 @@ class TTRequestBuilder {
             }
             return requestBody;
         } catch (Throwable ignore) {
-            return null;
+            return JSON.build();
         }
     }
 

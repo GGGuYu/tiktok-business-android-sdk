@@ -163,8 +163,22 @@ public class HttpRequestUtil {
 
     public static String doPost(String url, Map<String, String> headerParamMap, String jsonStr, boolean needSignature) {
         HttpRequestOptions options = new HttpRequestOptions();
-        options.connectTimeout = 2000;
-        options.readTimeout = 5000;
+
+        try {
+            if (url.contains(UrlConst.PATH_CONFIG2)
+                    || url.contains(UrlConst.PATH_DDL)
+                    || url.contains(UrlConst.PATH_CONFIG)) {
+                options.connectTimeout = NetworkTimeout.sConfigTime;
+                options.readTimeout = NetworkTimeout.sConfigTime * 3;
+            } else {
+                options.connectTimeout = NetworkTimeout.sEventTime;
+                options.readTimeout = NetworkTimeout.sEventTime * 3;
+            }
+        } catch (Throwable ignore) {
+            options.connectTimeout = 2000;
+            options.readTimeout = 5000;
+        }
+
         return doPost(url, headerParamMap, jsonStr, options, needSignature);
     }
 
