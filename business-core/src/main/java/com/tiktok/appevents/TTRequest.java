@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.UUID;
 
 class TTRequest {
     private static final String TAG = TTRequest.class.getCanonicalName();
@@ -301,12 +302,11 @@ class TTRequest {
         try {
             JSONObject propertiesJson = JSON.build();
 
+            JSON.putObject(propertiesJson, "event_id", UUID.randomUUID());
+            JSON.putObject(propertiesJson, "tt_event_id", TextUtils.isEmpty(event.getEventId()) ? "" : event.getEventId());
             JSON.putObject(propertiesJson, "type", event.getType());
             if (event.getEventName() != null) {
                 JSON.putObject(propertiesJson, "event", event.getEventName());
-            }
-            if (!TextUtils.isEmpty(event.getEventId())) {
-                JSON.putObject(propertiesJson, "event_id", event.getEventId());
             }
             JSON.putObject(propertiesJson, "timestamp", TimeUtil.getISO8601Timestamp(event.getTimeStamp()));
             if (TikTokBusinessSdk.isInSdkLDUMode()) {

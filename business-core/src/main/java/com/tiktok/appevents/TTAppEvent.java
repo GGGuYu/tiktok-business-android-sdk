@@ -8,7 +8,6 @@ package com.tiktok.appevents;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.text.TextUtils;
 import android.util.Base64;
 import android.view.View;
 
@@ -20,7 +19,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class TTAppEvent implements Serializable {
@@ -55,13 +53,6 @@ public class TTAppEvent implements Serializable {
         this.timeStamp = timeStamp;
         this.propertiesJson = propertiesJson;
         this.eventId = eventId;
-        try {
-            if (TextUtils.isEmpty(eventId)) {
-                this.eventId = UUID.randomUUID().toString();
-            }
-        }catch (Throwable e){
-            logger.error(e, "set eventId error");
-        }
         this.uniqueId = TTAppEvent.counter.getAndIncrement();
         this.userInfo = TTUserInfo.sharedInstance.clone();
         if (ttAppId != null && ttAppId.length > 0) {
