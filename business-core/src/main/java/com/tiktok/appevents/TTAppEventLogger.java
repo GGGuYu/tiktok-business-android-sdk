@@ -534,8 +534,14 @@ public class TTAppEventLogger {
                 JSONObject requestResult = TTRequest.getBusinessSDKConfig();
 
                 if (requestResult == null) {
-                    logger.info("Opt out of initGlobalConfig because global config is null, api returns error");
-                    return;
+                    logger.info("config is null, api returns error");
+
+                    //retry immediately and only once
+                    requestResult = TTRequest.getBusinessSDKConfig();
+                    if (requestResult == null) {
+                        logger.info("config is null, api returns error2");
+                        return;
+                    }
                 }
 
                 JSONObject businessSdkConfig = JSON.getJsonObject(requestResult, "business_sdk_config");

@@ -146,7 +146,7 @@ class TTRequest {
         if (result != null) {
             try {
                 JSONObject resultJson = JSON.build(result);
-                int code = JSON.getInt(resultJson, "code");
+                int code = JSON.getInt(resultJson, "code", -1);
                 if (code == 0) {
                     config = JSON.getJsonObject(resultJson, "data");
                 }
