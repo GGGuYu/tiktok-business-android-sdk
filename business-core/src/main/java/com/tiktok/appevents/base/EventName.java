@@ -18,8 +18,11 @@ public enum EventName {
     INSTALL_APP("InstallApp"),
     JOIN_GROUP("JoinGroup"),
     LAUNCH_APP("LaunchAPP"),
+    @Deprecated
     LOAN_APPLICATION("LoanApplication"),
+    @Deprecated
     LOAN_APPROVAL("LoanApproval"),
+    @Deprecated
     LOAN_DISBURSAL("LoanDisbursal"),
     LOGIN("Login"),
     RATE("Rate"),
