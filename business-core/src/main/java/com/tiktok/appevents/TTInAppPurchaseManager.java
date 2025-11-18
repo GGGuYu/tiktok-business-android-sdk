@@ -9,9 +9,9 @@ package com.tiktok.appevents;
 import static com.tiktok.appevents.contents.TTContentsEventConstants.Params.EVENT_PROPERTY_ORDER_ID;
 import static com.tiktok.util.TTConst.TRACK_TYPE;
 import static com.tiktok.util.TTConst.TRACK_TYPE_AUTO;
-import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
-import org.json.JSONArray;
+import com.tiktok.util.JSON;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -26,16 +26,15 @@ class TTInAppPurchaseManager {
     static JSONObject getPurchaseProps(TTPurchaseInfo purchaseInfo) {
         String productId = null;
         try {
-            productId = purchaseInfo.getPurchase().getString("productId");
+            productId = JSON.getString(purchaseInfo.getPurchase(), "productId");
             JSONObject skuDetail = purchaseInfo.getSkuDetails();
             JSONObject purchaseProperties = getPurchaseProperties(productId, skuDetail);
-            if(purchaseInfo.isAutoTrack() && purchaseProperties != null){
-                purchaseProperties.putOpt(TRACK_TYPE, TRACK_TYPE_AUTO);
-                purchaseProperties.putOpt(EVENT_PROPERTY_ORDER_ID, purchaseInfo.getPurchase().optString("orderId"));
+            if (purchaseInfo.isAutoTrack()) {
+                JSON.putObject(purchaseProperties, TRACK_TYPE, TRACK_TYPE_AUTO);
+                JSON.putObject(purchaseProperties, EVENT_PROPERTY_ORDER_ID, JSON.getString(purchaseInfo.getPurchase(), "orderId"));
             }
             return purchaseProperties;
-        } catch (JSONException e) {
-            TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
+        } catch (Throwable e) {
             return null;
         }
     }
@@ -44,36 +43,36 @@ class TTInAppPurchaseManager {
      * returns content_id -> sku always
      */
     private static JSONObject getPurchaseProperties(String sku, JSONObject skuDetails) throws JSONException {
-        JSONObject props = new JSONObject();
-        JSONObject content = new JSONObject().put("content_id", sku);
+        JSONObject props = JSON.build();
+
+        JSONObject content = JSON.build();
+        JSON.putObject(content, "content_id", sku);
+
         if (skuDetails != null) {
-            content.put("content_type", safeJsonGetString(skuDetails, "type"));
+            JSON.putInt(content, "quantity", 1);
+            JSON.putObject(content, "content_type", safeJsonGetString(skuDetails, "type"));
+
             String currencyCode = safeJsonGetString(skuDetails, "price_currency_code");
-            props.put("currency", currencyCode);
-            content.put("quantity", 1);
+            JSON.putObject(props, "currency", currencyCode);
             double dPrice = 0;
             try {
-                dPrice = new BigDecimal(skuDetails.optLong("price_amount_micros", 0) / 1000000.0).doubleValue();
-            } catch (Exception ignored) {
+                dPrice = BigDecimal.valueOf(JSON.getLong(skuDetails, "price_amount_micros", 0) / 1000000.0).doubleValue();
+            } catch (Throwable ignored) {
             }
-            content.put("price", dPrice);
-            props.put("value", dPrice);
+            JSON.putDouble(content, "price", dPrice);
+            JSON.putDouble(props, "value", dPrice);
         }
-        props.put("contents", new JSONArray().put(content));
+        JSON.putObject(props, "contents", JSON.buildArr().put(content));
         return props;
     }
 
     /**
      * safe get key from jsonobject
-     *
-     * @param jsonObject
-     * @param key
-     * @return
      */
     private static String safeJsonGetString(JSONObject jsonObject, String key) {
         try {
             return jsonObject.get(key).toString();
-        } catch (JSONException e) {
+        } catch (Throwable ignore) {
             return "";
         }
     }

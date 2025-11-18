@@ -6,7 +6,6 @@
 package com.tiktok.appevents.edp;
 
 import static com.tiktok.appevents.edp.EDPConfig.report_frequency_control;
-import static com.tiktok.appevents.edp.EDPConfig.time_diff_frequency_control;
 import static com.tiktok.appevents.edp.TTEDPEventConstants.EDP_EVENT_NAME_APP_LAUNCH;
 import static com.tiktok.appevents.edp.TTEDPEventConstants.EDP_EVENT_NAME_CLICK;
 import static com.tiktok.appevents.edp.TTEDPEventConstants.EDP_EVENT_NAME_PAGE_SHOW;
@@ -31,6 +30,7 @@ import static com.tiktok.appevents.edp.TTEDPEventConstants.EDP_EVENT_PROPERTY_SO
 import static com.tiktok.appevents.edp.TTEDPEventConstants.EDP_EVENT_PROPERTY_WEBVIEW_REQUEST_URL;
 
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.util.JSON;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -39,17 +39,19 @@ import java.util.Random;
 
 public class TTEDPEventTrack {
     private static TTAppLaunchEvent ttAppLaunchEvent;
-    public static long LAST_CLICK_TS = 0l;
+    public static long LAST_CLICK_TS = 0L;
     private static boolean hasSendLaunch = false;
     public static volatile boolean isSending = false;
     public static volatile boolean pageShowIsSending = false;
-    public static void trackAppLaunch(String refer, String sourceUrl){
+
+    public static void trackAppLaunch(String refer, String sourceUrl) {
         try {
-            JSONObject property = new JSONObject();
-            property.put(EDP_EVENT_PROPERTY_REFER, refer);
-            property.put(EDP_EVENT_PROPERTY_SOURCE_URL, sourceUrl);
-            JSONObject eventProp = new JSONObject();
-            eventProp.put("meta", property);
+            JSONObject property = JSON.build();
+            JSON.putObject(property, EDP_EVENT_PROPERTY_REFER, refer);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_SOURCE_URL, sourceUrl);
+
+            JSONObject eventProp = JSON.build();
+            JSON.putObject(eventProp, "meta", property);
             if (TikTokBusinessSdk.isInitialized()) {
                 TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_APP_LAUNCH, eventProp, null);
             } else {
@@ -57,8 +59,7 @@ public class TTEDPEventTrack {
                     ttAppLaunchEvent = new TTAppLaunchEvent(property, System.currentTimeMillis());
                 }
             }
-        }catch (Throwable throwable){
-
+        } catch (Throwable ignore) {
         }
     }
 
@@ -66,98 +67,93 @@ public class TTEDPEventTrack {
         try {
             if (ttAppLaunchEvent != null) {
                 hasSendLaunch = true;
-                JSONObject eventProp = new JSONObject();
-                eventProp.put("meta", ttAppLaunchEvent.getProp());
+                JSONObject eventProp = JSON.build();
+                JSON.putObject(eventProp, "meta", ttAppLaunchEvent.getProp());
                 TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_APP_LAUNCH, eventProp, null);
                 ttAppLaunchEvent = null;
             }
-        } catch (Exception e) {
-
+        } catch (Exception ignore) {
         }
     }
 
-    public static void trackWebviewRequest(String url){
+    public static void trackWebviewRequest(String url) {
         try {
-            JSONObject property = new JSONObject();
-            property.put(EDP_EVENT_PROPERTY_WEBVIEW_REQUEST_URL, url);
-            JSONObject eventProp = new JSONObject();
-            eventProp.put("meta", property);
+            JSONObject property = JSON.build();
+            JSON.putObject(property, EDP_EVENT_PROPERTY_WEBVIEW_REQUEST_URL, url);
+
+            JSONObject eventProp = JSON.build();
+            JSON.putObject(eventProp, "meta", property);
             TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_WEBVIEW_REQUEST, eventProp, null);
-        }catch (Throwable throwable){
-
+        } catch (Throwable ignore) {
         }
     }
 
-    public static void trackPageShow(String pageName, int index, boolean isFromBackground, JSONObject components, int pageCount){
+    public static void trackPageShow(String pageName, int index, boolean isFromBackground, JSONObject components, int pageCount) {
         try {
-            JSONObject property = new JSONObject();
-            property.put(EDP_EVENT_PROPERTY_CURRENT_PAGE_NAME, pageName);
-            property.put(EDP_EVENT_PROPERTY_INDEX, index);
-            property.put(EDP_EVENT_PROPERTY_FROM_BACKGROUND, isFromBackground);
-            property.put(EDP_EVENT_PROPERTY_PAGE_COMPONENTS, components);
-            property.put(EDP_EVENT_PROPERTY_PAGE_DEEP_COUNT, pageCount);
-            JSONObject eventProp = new JSONObject();
-            eventProp.put("meta", property);
+            JSONObject property = JSON.build();
+            JSON.putObject(property, EDP_EVENT_PROPERTY_CURRENT_PAGE_NAME, pageName);
+            JSON.putInt(property, EDP_EVENT_PROPERTY_INDEX, index);
+            JSON.putBoolean(property, EDP_EVENT_PROPERTY_FROM_BACKGROUND, isFromBackground);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_PAGE_COMPONENTS, components);
+            JSON.putInt(property, EDP_EVENT_PROPERTY_PAGE_DEEP_COUNT, pageCount);
+
+            JSONObject eventProp = JSON.build();
+            JSON.putObject(eventProp, "meta", property);
             TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_PAGE_SHOW, eventProp, null);
             pageShowIsSending = false;
-        }catch (Throwable throwable){
-            throwable.printStackTrace();
+        } catch (Throwable ignore) {
         }
     }
 
     public static void trackClick(String className, float x, float y, int width, int height, String text,
-                                  String pageName, JSONObject components, int pageCount, long duration){
+                                  String pageName, JSONObject components, int pageCount, long duration) {
         try {
             LAST_CLICK_TS = System.currentTimeMillis();
-            JSONObject property = new JSONObject();
-            property.put(EDP_EVENT_PROPERTY_CLICK_POSITON_X, x);
-            property.put(EDP_EVENT_PROPERTY_CLICK_POSITON_Y, y);
-            property.put(EDP_EVENT_PROPERTY_CLICK_SIZE_W, width);
-            property.put(EDP_EVENT_PROPERTY_CLICK_SIZE_H, height);
-            property.put(EDP_EVENT_PROPERTY_CLICK_BUTTON_TEXT, text);
-            property.put(EDP_EVENT_PROPERTY_CURRENT_PAGE_NAME, pageName);
-            property.put(EDP_EVENT_PROPERTY_PAGE_COMPONENTS, components);
-            property.put(EDP_EVENT_PROPERTY_PAGE_DEEP_COUNT, pageCount);
-            property.put(EDP_EVENT_PROPERTY_CLICK_DURATION, duration);
-            property.put(EDP_EVENT_PROPERTY_CLASS_NAME, className);
-            JSONObject eventProp = new JSONObject();
-            eventProp.put("meta", property);
+            JSONObject property = JSON.build();
+            JSON.putDouble(property, EDP_EVENT_PROPERTY_CLICK_POSITON_X, x);
+            JSON.putDouble(property, EDP_EVENT_PROPERTY_CLICK_POSITON_Y, y);
+            JSON.putInt(property, EDP_EVENT_PROPERTY_CLICK_SIZE_W, width);
+            JSON.putInt(property, EDP_EVENT_PROPERTY_CLICK_SIZE_H, height);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_CLICK_BUTTON_TEXT, text);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_CURRENT_PAGE_NAME, pageName);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_PAGE_COMPONENTS, components);
+            JSON.putInt(property, EDP_EVENT_PROPERTY_PAGE_DEEP_COUNT, pageCount);
+            JSON.putLong(property, EDP_EVENT_PROPERTY_CLICK_DURATION, duration);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_CLASS_NAME, className);
+
+            JSONObject eventProp = JSON.build();
+            JSON.putObject(eventProp, "meta", property);
             TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_CLICK, eventProp, null);
             isSending = false;
-        }catch (Throwable throwable){
-
+        } catch (Throwable ignore) {
         }
     }
 
-    public static void trackPayShow(int code, JSONArray skuInfo){
+    public static void trackPayShow(int code, JSONArray skuInfo) {
         try {
-            JSONObject property = new JSONObject();
-            property.put(EDP_EVENT_PROPERTY_PAY_CODE, code);
-            property.put(EDP_EVENT_PROPERTY_PAY_SKU_INFO, skuInfo);
-            JSONObject eventProp = new JSONObject();
-            eventProp.put("meta", property);
+            JSONObject property = JSON.build();
+            JSON.putInt(property, EDP_EVENT_PROPERTY_PAY_CODE, code);
+            JSON.putObject(property, EDP_EVENT_PROPERTY_PAY_SKU_INFO, skuInfo);
+
+            JSONObject eventProp = JSON.build();
+            JSON.putObject(eventProp, "meta", property);
             TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_PAY_SHOW, eventProp, null);
-        }catch (Throwable throwable){
-
+        } catch (Throwable ignore) {
         }
     }
 
-    public static void trackUnityEvent(String name, JSONObject meta){
+    public static void trackUnityEvent(String name, JSONObject meta) {
         try {
-            JSONObject eventProp = new JSONObject();
-            eventProp.put("meta", meta);
-            eventProp.put("api_platform", meta.remove("api_platform"));
+            JSONObject eventProp = JSON.build();
+            JSON.putObject(eventProp, "meta", meta);
+            JSON.putObject(eventProp, "api_platform", meta.remove("api_platform"));
             TikTokBusinessSdk.getAppEventLogger().trackEdp(name, eventProp, null);
-        }catch (Throwable throwable){
-            throwable.printStackTrace();
+        } catch (Throwable ignore) {
         }
     }
 
     public static boolean checkUpload() {
-        if (new Random().nextDouble() <= report_frequency_control) {
-            return true;
-        }
-        return false;
+        return new Random().nextDouble() <= report_frequency_control;
     }
 
 }

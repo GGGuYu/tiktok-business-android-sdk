@@ -19,21 +19,19 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.WindowManager;
-import android.text.TextUtils;
 import android.webkit.WebSettings;
-import androidx.annotation.RequiresApi;
 
 import com.android.installreferrer.api.InstallReferrerClient;
 import com.android.installreferrer.api.InstallReferrerStateListener;
 import com.android.installreferrer.api.ReferrerDetails;
 import com.tiktok.BuildConfig;
 import com.tiktok.TikTokBusinessSdk;
-import com.tiktok.appevents.edp.Sensig;
-
 import com.tiktok.appevents.ReferrerInfo;
+import com.tiktok.appevents.edp.Sensig;
 
 import org.json.JSONObject;
 
@@ -46,27 +44,54 @@ import java.util.UUID;
 
 public class SystemInfoUtil {
 
-    static PackageManager pm;
-    static PackageInfo packageInfo;
-    static Application application;
-    static String appSessionId = "";
-    static ReferrerInfo referrerInfo = null;
+    private static String sAPPName = "";
+    private static String sPackageName = "";
+    private static String sVerName = "";
+    private static int sVerCode = 0;
 
-    static {
+
+    private static String sAppSessionId = "";
+    private static ReferrerInfo sReferrerInfo = null;
+
+    private static void initInfo() {
         try {
-            application = TikTokBusinessSdk.getApplicationContext();
-            pm = application.getPackageManager();
-            packageInfo = pm.getPackageInfo(TikTokBusinessSdk.getApplicationContext().getPackageName(), 0);
-        } catch (Exception ignored) {
+            Application application = TikTokBusinessSdk.getApplicationContext();
+            if (application == null) {
+                return;
+            }
+
+            sPackageName = application.getPackageName();
+
+
+            PackageManager pm = application.getPackageManager();
+            sAPPName = application.getApplicationInfo().loadLabel(pm).toString();
+
+            PackageInfo info = pm.getPackageInfo(sPackageName, 0);
+
+            sVerName = info.versionName;
+
+            if (Build.VERSION.SDK_INT >= 28) {
+                sVerCode = Long.valueOf(info.getLongVersionCode()).intValue();
+            } else {
+                sVerCode = info.versionCode;
+            }
+
+        } catch (Throwable ignored) {
         }
     }
 
     public static String getPackageName() {
-        return packageInfo.packageName;
+        if (TextUtils.isEmpty(sPackageName)) {
+            initInfo();
+        }
+        return sPackageName == null ? "" : sPackageName;
     }
 
     public static String getAppName() {
-        return application.getApplicationInfo().loadLabel(pm).toString();
+        if (TextUtils.isEmpty(sAPPName)) {
+            initInfo();
+        }
+        return sAPPName == null ? "" : sAPPName;
     }
 
     public static String getSDKVersion() {
@@ -74,27 +99,23 @@ public class SystemInfoUtil {
     }
 
     public static String getAppVersionName() {
-        if (packageInfo == null) {
-            return "";
+        if (TextUtils.isEmpty(sVerName)) {
+            initInfo();
         }
-        return packageInfo.versionName;
+        return sVerName == null ? "" : sVerName;
     }
 
     public static int getAppVersionCode() {
-        if (packageInfo == null) {
-            return 0;
+        if (sVerCode == 0) {
+            initInfo();
         }
-        if (Build.VERSION.SDK_INT >= 28) {
-            return (int) packageInfo.getLongVersionCode();
-        }
-        // noinspection deprecation
-        return packageInfo.versionCode;
+
+        return sVerCode;
     }
 
     public static String getLocalIpAddress() {
         try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
-                 en.hasMoreElements(); ) {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
                 NetworkInterface intf = en.nextElement();
                 for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
                     InetAddress inetAddress = enumIpAddr.nextElement();
@@ -103,8 +124,7 @@ public class SystemInfoUtil {
                     }
                 }
             }
-        } catch (Exception ex) {
-            return "";
+        } catch (Throwable ignore) {
         }
         return "";
     }
@@ -113,66 +133,77 @@ public class SystemInfoUtil {
         return Locale.getDefault().getLanguage();
     }
 
-    private static String userAgent = null;
     public static void updateSensigInfo() {
         try {
             Sensig sensig = TTUtil.getSensigInfo(TikTokBusinessSdk.getApplicationContext());
-            if(sensig == null){
+            if (sensig == null) {
                 return;
             }
             if (!TextUtils.isEmpty(sensig.getRegexList())) {
                 sensig_filtering_regex_version = sensig.getVersion();
                 sensig_filtering_regex_list = sensig.getRegexList();
             }
-        }catch (Throwable e){
-
+        } catch (Throwable ignore) {
         }
     }
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR1)
+
+    private static String sUserAgent = null;
+
     public static void initUserAgent() {
-        if (userAgent != null) return;
+        if (!TextUtils.isEmpty(sUserAgent)) return;
+
         long initTimeMS = System.currentTimeMillis();
         Throwable ex = null;
         try {
             TikTokBusinessSdk.getAppEventLogger().monitorMetric("ua_init", TTUtil.getMetaWithTS(initTimeMS), null);
             TTKeyValueStore store = new TTKeyValueStore(TikTokBusinessSdk.getApplicationContext());
-            userAgent = store.get(TTSDK_USER_AGENT);
-            if (TextUtils.isEmpty(userAgent)) {
-                userAgent = WebSettings.getDefaultUserAgent(TikTokBusinessSdk.getApplicationContext());
-                store.set(TTSDK_USER_AGENT, userAgent);
+            sUserAgent = store.get(TTSDK_USER_AGENT);
+
+            if (TextUtils.isEmpty(sUserAgent)) {
+                sUserAgent = WebSettings.getDefaultUserAgent(TikTokBusinessSdk.getApplicationContext());
+                store.set(TTSDK_USER_AGENT, sUserAgent);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             ex = e;
-            userAgent = System.getProperty("http.agent");
         }
+
+        try {
+            if (TextUtils.isEmpty(sUserAgent)) {
+                sUserAgent = System.getProperty("http.agent");
+            }
+        } catch (Throwable e) {
+            ex = e;
+        }
+
+
         // to avoid loops
-        if (userAgent == null) userAgent = "";
+        if (TextUtils.isEmpty(sUserAgent)) sUserAgent = "";
         long endTimeMS = System.currentTimeMillis();
         try {
-            JSONObject meta = TTUtil.getMetaException(ex, endTimeMS, TTSDK_EXCEPTION_SDK_CATCH)
-                    .put("latency", endTimeMS-initTimeMS);
+            JSONObject meta = TTUtil.getMetaException(ex, endTimeMS, TTSDK_EXCEPTION_SDK_CATCH);
+            JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
             TikTokBusinessSdk.getAppEventLogger().monitorMetric("ua_end", meta, null);
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void initAppSessionId() {
         try {
-            appSessionId = UUID.randomUUID().toString();
-        }catch (Throwable e){
-
+            sAppSessionId = UUID.randomUUID().toString();
+        } catch (Throwable ignore) {
         }
     }
 
     public static String getAppSessionId() {
-        if(TextUtils.isEmpty(appSessionId)){
+        if (TextUtils.isEmpty(sAppSessionId)) {
             initAppSessionId();
         }
-        return appSessionId;
+        return sAppSessionId;
     }
 
     public static void initInstallReferrer() {
-        try{
-            if(referrerInfo != null){
+        try {
+            if (sReferrerInfo != null) {
                 return;
             }
             InstallReferrerClient referrerClient = InstallReferrerClient.newBuilder(TikTokBusinessSdk.getApplicationContext()).build();
@@ -183,7 +214,7 @@ public class SystemInfoUtil {
                         TTHandlerUtil.getInstance().post(new Runnable() {
                             @Override
                             public void run() {
-                                try{
+                                try {
                                     switch (responseCode) {
                                         case InstallReferrerClient.InstallReferrerResponse.OK:
                                             try {
@@ -191,9 +222,8 @@ public class SystemInfoUtil {
                                                 String referrerUrl = response.getInstallReferrer();
                                                 long referrerClickTime = response.getReferrerClickTimestampSeconds();
                                                 long appInstallTime = response.getInstallBeginTimestampSeconds();
-                                                referrerInfo = new ReferrerInfo(referrerUrl, appInstallTime, referrerClickTime);
-                                            } catch (Throwable e) {
-
+                                                sReferrerInfo = new ReferrerInfo(referrerUrl, appInstallTime, referrerClickTime);
+                                            } catch (Throwable ignore) {
                                             }
                                             break;
                                         case InstallReferrerClient.InstallReferrerResponse.FEATURE_NOT_SUPPORTED:
@@ -202,13 +232,11 @@ public class SystemInfoUtil {
                                             break;
                                     }
                                     referrerClient.endConnection();
-                                }catch (Throwable throwable){
-
+                                } catch (Throwable ignore) {
                                 }
                             }
                         });
-                    }catch (Throwable throwable){
-
+                    } catch (Throwable ignore) {
                     }
                 }
 
@@ -217,23 +245,22 @@ public class SystemInfoUtil {
 
                 }
             });
-        }catch (Throwable throwable){
-
+        } catch (Throwable ignore) {
         }
     }
 
     public static ReferrerInfo getInstallReferrer() {
-        if(referrerInfo == null){
+        if (sReferrerInfo == null) {
             initInstallReferrer();
         }
-        return referrerInfo;
+        return sReferrerInfo;
     }
 
     public static String getUserAgent() {
-        if (userAgent == null) {
+        if (TextUtils.isEmpty(sUserAgent)) {
             initUserAgent();
         }
-        return userAgent;
+        return sUserAgent;
     }
 
     public static String getAndroidVersion() {
@@ -279,24 +306,87 @@ public class SystemInfoUtil {
                         return "?";
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {
+        }
         return "?";
     }
 
-    public static int[] getScreenWidthAndHeight() {
-        try {
-            WindowManager windowManager = (WindowManager) TikTokBusinessSdk.getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
-            Display display = windowManager.getDefaultDisplay();
-            DisplayMetrics dm = new DisplayMetrics();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+    private static int sScreenWidth = -1;
+    private static int sScreenHeight = -1;
+    private static float sDensity = -1F;
+
+    private static void initScreenWidthAndHeight() {
+        final Context ctx = TikTokBusinessSdk.getApplicationContext();
+        if (ctx != null) {
+            try {
+                WindowManager windowManager = (WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE);
+                Display display = windowManager.getDefaultDisplay();
+                DisplayMetrics dm = new DisplayMetrics();
                 display.getRealMetrics(dm);
-            } else {
-                display.getMetrics(dm);
+                sDensity = dm.density;
+                sScreenWidth = dm.widthPixels;
+                sScreenHeight = dm.heightPixels;
+            } catch (Throwable ignore) {
+                try {
+                    DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
+                    sDensity = dm.density;
+                    sScreenWidth = dm.widthPixels;
+                    sScreenHeight = dm.heightPixels;
+                } catch (Throwable ignore2) {
+                }
             }
-            return new int[]{dm.widthPixels, dm.heightPixels};
-        } catch (Throwable e) {
-            return new int[]{0, 0};
         }
+    }
+
+    public static int getsScreenWidth() {
+        if (sScreenWidth <= 0) {
+            initScreenWidthAndHeight();
+        }
+        return Math.max(sScreenWidth, 0);
+    }
+
+    public static int getsScreenHeight() {
+        if (sScreenHeight <= 0) {
+            initScreenWidthAndHeight();
+        }
+        return Math.max(sScreenHeight, 0);
+    }
+
+    public static float getsDensity() {
+        if (sDensity <= 0) {
+            initScreenWidthAndHeight();
+        }
+        return Math.max(sDensity, 0);
+    }
+
+    private static boolean sHasGetUnity = false;
+    private static boolean sIsUnity = false;
+    private static String sLibraryName = "";
+
+    public static boolean isUnity() {
+        if (!sHasGetUnity) {
+            try {
+                Class.forName("com.unity3d.player.UnityPlayer");
+                sIsUnity = true;
+            } catch (Throwable ignore) {
+                sIsUnity = false;
+            }
+            sHasGetUnity = true;
+        }
+
+        return sIsUnity;
+    }
+
+    public static String getLibraryName() {
+        if (TextUtils.isEmpty(sLibraryName)) {
+            if (isUnity()) {
+                sLibraryName = "tiktok-business-unity-android-sdk";
+            } else {
+                sLibraryName = "tiktok-business-android-sdk";
+            }
+        }
+
+        return sLibraryName;
     }
 
 }

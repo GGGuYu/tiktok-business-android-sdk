@@ -6,7 +6,6 @@
 
 package com.tiktok.appevents;
 
-import static com.tiktok.TikTokBusinessSdk.getApiTrackDomain;
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
 import android.text.TextUtils;
@@ -14,6 +13,7 @@ import android.text.TextUtils;
 import com.tiktok.BuildConfig;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.HttpRequestUtil;
+import com.tiktok.util.JSON;
 import com.tiktok.util.SystemInfoUtil;
 import com.tiktok.util.TTConst;
 import com.tiktok.util.TTLogger;
@@ -21,15 +21,12 @@ import com.tiktok.util.TTUtil;
 import com.tiktok.util.TimeUtil;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 
 class TTRequest {
@@ -49,22 +46,16 @@ class TTRequest {
 
     private static final Map<String, String> headParamMap = new HashMap<>();
     private static final Map<String, String> getHeadParamMap = new HashMap<>();
-    public static String LIBRARY_NAME = "tiktok-business-android-sdk";
 
     static {
         // these fields wont change, so cache it locally to enhance performance
         headParamMap.put("Content-Type", "application/json");
         headParamMap.put("Connection", "Keep-Alive");
-        try {
-            Class.forName("com.unity3d.player.UnityPlayer");
-            LIBRARY_NAME = "tiktok-business-unity-android-sdk";
-        } catch (Throwable e) {
-
-        }
         String ua = String.format("tiktok-business-android-sdk/%s/%s",
                 BuildConfig.VERSION_NAME,
                 TikTokBusinessSdk.getApiAvailableVersion());
         headParamMap.put("User-Agent", ua);
+
         // no content-type application/json for get requests
         getHeadParamMap.put("Connection", "Keep-Alive");
         getHeadParamMap.put("User-Agent", ua);
@@ -75,34 +66,39 @@ class TTRequest {
         long initTimeMS = System.currentTimeMillis();
 //        TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api_start", TTUtil.getMetaWithTS(initTimeMS), null);
         logger.info("Try to fetch global configs");
-        JSONObject jsonObject = new JSONObject();
+        JSONObject jsonObject = JSON.build();
         try {
-            JSONObject app = new JSONObject();
-            app.put("id", TikTokBusinessSdk.getAppId());
-            app.put("tiktok_app_id", TikTokBusinessSdk.getTTAppId());
-            app.put("version", SystemInfoUtil.getAppVersionName());
-            jsonObject.put("app", app);
-            JSONObject device = new JSONObject();
-            device.put("platform", "Android");
-            TTIdentifierFactory.AdIdInfo adIdInfo = null;
+            JSONObject app = JSON.build();
+            JSON.putObject(app, "id", TikTokBusinessSdk.getAppId());
+            JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
+            JSON.putObject(app, "version", SystemInfoUtil.getAppVersionName());
+
+            JSON.putObject(jsonObject, "app", app);
+
+            JSONObject device = JSON.build();
+            JSON.putObject(device, "platform", "Android");
+            JSON.putObject(device, "version", SystemInfoUtil.getAndroidVersion());
             if (TikTokBusinessSdk.isGaidCollectionEnabled()) {
-                adIdInfo = TTIdentifierFactory.getGoogleAdIdInfo(TikTokBusinessSdk.getApplicationContext());
+                try {
+                    TTIdentifierFactory.AdIdInfo adIdInfo = TTIdentifierFactory.getGoogleAdIdInfo(TikTokBusinessSdk.getApplicationContext());
+                    JSON.putObject(device, "gaid", adIdInfo.getAdId());
+                } catch (Throwable ignore) {
+                }
             }
-            if (adIdInfo != null) {
-                device.put("gaid", adIdInfo.getAdId());
+
+            JSON.putObject(jsonObject, "device", device);
+            if (TikTokBusinessSdk.isInSdkDebugMode()) {
+                JSON.putObject(jsonObject, "debug", "true");
             }
-            device.put("version", SystemInfoUtil.getAndroidVersion());
-            jsonObject.put("device", device);
-            if(TikTokBusinessSdk.isInSdkDebugMode()) {
-                jsonObject.put("debug", "true");
-            }
-            JSONObject library = new JSONObject();
-            library.put("name", "tiktok/" + LIBRARY_NAME);
-            library.put("version", SystemInfoUtil.getSDKVersion());
-            library.put("smart_sdk_client_flag", TikTokBusinessSdk.isEdpEnable());
-            jsonObject.put("library", library);
-        }catch (Exception exception){
-            logger.error(exception, exception.getMessage());
+
+            JSONObject library = JSON.build();
+            JSON.putObject(library, "name", "tiktok/" + SystemInfoUtil.getLibraryName());
+            JSON.putObject(library, "version", SystemInfoUtil.getSDKVersion());
+            JSON.putBoolean(library, "smart_sdk_client_flag", TikTokBusinessSdk.isEdpEnable());
+
+            JSON.putObject(jsonObject, "library", library);
+        } catch (Throwable e) {
+            logger.error(e, e.getMessage());
         }
 
         String url = "https://analytics.us.tiktok.com/api/v1/app_sdk/config";
@@ -110,15 +106,15 @@ class TTRequest {
         if (TextUtils.isEmpty(TikTokBusinessSdk.getTTAppId()) || TextUtils.isEmpty(TikTokBusinessSdk.getAppId())) {
             try {
                 long endTimeMS = System.currentTimeMillis();
-                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-                        .put("latency", endTimeMS - initTimeMS)
-                        .put("success", false)
-                        .put("log_id", "");
+                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+                JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+                JSON.putBoolean(meta, "success", false);
+                JSON.putObject(meta, "log_id", "");
                 TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api", meta, null);
-            } catch (Exception ignored) {
+            } catch (Throwable ignored) {
             }
-            JSONObject result = new JSONObject();
-            result.optBoolean("enable_sdk", false);
+            JSONObject result = JSON.build();
+            JSON.putBoolean(result, "enable_sdk", false);
             return result;
         }
         String result = HttpRequestUtil.doPost(url, getHeadParamMap, jsonObject.toString(), false);
@@ -126,25 +122,26 @@ class TTRequest {
         JSONObject config = null;
         if (result != null) {
             try {
-                JSONObject resultJson = new JSONObject(result);
-                Integer code = (Integer) resultJson.get("code");
+                JSONObject resultJson = JSON.build(result);
+                int code = JSON.getInt(resultJson, "code");
                 if (code == 0) {
-                    config = (JSONObject) resultJson.get("data");
+                    config = JSON.getJsonObject(resultJson, "data");
                 }
-                logger.info("Global config fetched: " + TTUtil.ppStr(config));
-            } catch (Exception e) {
+                logger.info("Global config fetched: " + config);
+            } catch (Throwable e) {
                 // might be api returning something wrong
                 TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
             }
         }
         try {
             long endTimeMS = System.currentTimeMillis();
-            JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-                    .put("latency", endTimeMS-initTimeMS)
-                    .put("success", config != null)
-                    .put("log_id", HttpRequestUtil.getLogIDFromApi(result));
+            JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+            JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+            JSON.putBoolean(meta, "success", config != null);
+            JSON.putObject(meta, "log_id", HttpRequestUtil.getLogIDFromApi(result));
             TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api", meta, null);
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {
+        }
         // might be api returning something wrong
         return config;
     }
@@ -160,12 +157,12 @@ class TTRequest {
      * then be sent separately,
      * Any failed events will be accumulated and finally returned.
      *
-     * @param appEventList
+     * @param appEventList event list
      * @return the accumulation of all failed events
      */
     public static synchronized List<TTAppEvent> reportAppEvent(JSONObject basePayload, List<TTAppEvent> appEventList, boolean isEdp) {
         TTUtil.checkThread(TAG);
-        if (appEventList == null || appEventList.size() == 0) {
+        if (appEventList == null || appEventList.isEmpty()) {
             return new ArrayList<>();
         }
 
@@ -185,35 +182,33 @@ class TTRequest {
         List<List<TTAppEvent>> chunks = averageAssign(appEventList, MAX_EVENT_SIZE);
 
         for (List<TTAppEvent> currentBatch : chunks) {
-//            long initTimeMS = System.currentTimeMillis();
-//            try {
-//                JSONObject initMeta = TTUtil.getMetaWithTS(initTimeMS)
-//                        .put("size", currentBatch.size())
-//                        .put("total", appEventList.size());
-//                TikTokBusinessSdk.getAppEventLogger().monitorMetric("track_api_start", initMeta, null);
-//            } catch (Exception ignored) {}
-
-            List<JSONObject> batch = new ArrayList<>();
+            JSONArray batch = JSON.buildArr();
             for (TTAppEvent event : currentBatch) {
                 JSONObject propertiesJson = transferJson(event);
                 if (propertiesJson == null) {
                     continue;
                 }
-                batch.add(propertiesJson);
+                JSON.putArr(batch, propertiesJson);
             }
 
-            JSONObject bodyJson = basePayload;
+            if (batch.length() == 0) {
+                continue;
+            }
+
+            //remove
+            JSON.putObject(basePayload, "batch", null);
+
             try {
-                bodyJson.put("batch", new JSONArray(batch));
+                JSON.putObject(basePayload, "batch", batch);
             } catch (Throwable e) {
-                if(!isEdp) {
+                if (!isEdp) {
                     failedEventsToBeSaved.addAll(currentBatch);
                 }
                 TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
                 continue;
             }
-            String result = HttpRequestUtil.doPost(url, headParamMap, bodyJson.toString());
-            if(isEdp){
+            String result = HttpRequestUtil.doPost(url, headParamMap, basePayload.toString());
+            if (isEdp) {
                 return null;
             }
             if (result == null) {
@@ -221,12 +216,12 @@ class TTRequest {
                 failedRequests += currentBatch.size();
             } else {
                 try {
-                    JSONObject resultJson = new JSONObject(result);
-                    int code = resultJson.getInt("code");
+                    JSONObject resultJson = JSON.build(result);
+                    int code = JSON.getInt(resultJson, "code");
 
                     if (TikTokBusinessSdk.isInSdkDebugMode() || code == TTConst.ApiErrorCodes.API_ERROR.code || code == TTConst.ApiErrorCodes.PARTIAL_SUCCESS.code) {
-                        if(currentBatch != null){
-                            failedEventsToBeDiscardedSize+=currentBatch.size();
+                        if (currentBatch != null) {
+                            failedEventsToBeDiscardedSize += currentBatch.size();
                         }
                         failedRequests += currentBatch.size();
                     } else if (code != 0) {
@@ -236,26 +231,15 @@ class TTRequest {
                         successfulRequests += currentBatch.size();
                         successfullySentRequests.addAll(currentBatch);
                     }
-                } catch (JSONException e) {
+                } catch (Throwable e) {
                     failedRequests += currentBatch.size();
                     failedEventsToBeSaved.addAll(currentBatch);
                     TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
                 }
-                logger.debug(TTUtil.ppStr(result));
+                logger.debug(result);
             }
-            notifyChange();
 
-//            long endTimeMS = System.currentTimeMillis();
-//            try {
-//                JSONObject endMeta = TTUtil.getMetaWithTS(endTimeMS)
-//                        .put("size", currentBatch.size())
-//                        .put("total", appEventList.size())
-//                        .put("log_id", HttpRequestUtil.getLogIDFromApi(result))
-//                        .put("latency", endTimeMS-initTimeMS)
-//                        .put("status_code", HttpRequestUtil.getCodeFromApi(result))
-//                        .put("success", result != null);
-//                TikTokBusinessSdk.getAppEventLogger().monitorMetric("track_api_end", endMeta, null);
-//            } catch (Exception ignored) {}
+            notifyChange();
         }
         logger.debug("Flushed %d events successfully", successfulRequests);
 
@@ -293,32 +277,40 @@ class TTRequest {
             return null;
         }
         try {
-            JSONObject propertiesJson = new JSONObject();
-            propertiesJson.put("type", event.getType());
+            JSONObject propertiesJson = JSON.build();
+
+            JSON.putObject(propertiesJson, "type", event.getType());
             if (event.getEventName() != null) {
-                propertiesJson.put("event", event.getEventName());
+                JSON.putObject(propertiesJson, "event", event.getEventName());
             }
             if (!TextUtils.isEmpty(event.getEventId())) {
-                propertiesJson.put("event_id", event.getEventId());
+                JSON.putObject(propertiesJson, "event_id", event.getEventId());
             }
-            propertiesJson.put("timestamp", TimeUtil.getISO8601Timestamp(event.getTimeStamp()));
+            JSON.putObject(propertiesJson, "timestamp", TimeUtil.getISO8601Timestamp(event.getTimeStamp()));
             if (TikTokBusinessSdk.isInSdkLDUMode()) {
-                propertiesJson.put("limited_data_use", true);
+                JSON.putBoolean(propertiesJson, "limited_data_use", true);
             }
-            JSONObject properties = new JSONObject(event.getPropertiesJson());
-            if (properties.length() != 0) {
-                propertiesJson.put("properties", properties);
+
+            final JSONObject properties = JSON.build(event.getPropertiesJson());
+            if (properties != null && properties.length() > 0) {
+                JSON.putObject(propertiesJson, "properties", properties);
             }
-            propertiesJson.put("context", TTRequestBuilder.getContextForApi(event));
-            if(SystemInfoUtil.getInstallReferrer() != null){
-                propertiesJson.put("gp_referrer_install_ts", SystemInfoUtil.getInstallReferrer().getGpReferrerInstallTs());
-                propertiesJson.put("gp_referrer_click_ts", SystemInfoUtil.getInstallReferrer().getGpReferrerClickTs());
+
+            JSON.putObject(propertiesJson, "context", TTRequestBuilder.getContextForApi(event));
+
+            final ReferrerInfo refer = SystemInfoUtil.getInstallReferrer();
+            if (refer != null) {
+                JSON.putLong(propertiesJson, "gp_referrer_install_ts", refer.getGpReferrerInstallTs());
+                JSON.putLong(propertiesJson, "gp_referrer_click_ts", refer.getGpReferrerClickTs());
             }
-            if (event.getScreenShot() != null) {
-                propertiesJson.put("screenshot", event.getScreenShot());
+
+            final String screenShot = event.getScreenShot();
+            if (!TextUtils.isEmpty(screenShot)) {
+                JSON.putObject(propertiesJson, "screenshot", screenShot);
             }
+
             return propertiesJson;
-        } catch (JSONException e) {
+        } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
             return null;
         }
@@ -326,21 +318,27 @@ class TTRequest {
 
     /**
      * split event list
-     *
-     * @param sourceList
-     * @param splitNum
-     * @param <T>
      */
     public static <T> List<List<T>> averageAssign(List<T> sourceList, int splitNum) {
         List<List<T>> result = new ArrayList<>();
 
-        int size = sourceList.size();
-        int times = size % splitNum == 0 ? size / splitNum : size / splitNum + 1;
-        for (int i = 0; i < times; i++) {
-            int start = i * splitNum;
-            int end = i * splitNum + splitNum;
-            result.add(new ArrayList<>(sourceList.subList(start, Math.min(size, end))));
+        try {
+            List<T> splitList = new ArrayList<>();
+            int count = sourceList.size();
+            for (int i = 0; i < count; i++) {
+                try {
+                    splitList.add(sourceList.get(i));
+
+                    if (splitList.size() >= splitNum || i == count - 1) {
+                        result.add(splitList);
+                        splitList = new ArrayList<>();
+                    }
+                } catch (Throwable ignore) {
+                }
+            }
+        } catch (Throwable ignore) {
         }
+
         return result;
     }
 

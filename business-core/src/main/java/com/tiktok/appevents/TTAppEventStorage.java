@@ -11,8 +11,10 @@ import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 import android.content.Context;
 
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.util.JSON;
 import com.tiktok.util.TTLogger;
 import com.tiktok.util.TTUtil;
+
 import org.json.JSONObject;
 
 import java.io.BufferedOutputStream;
@@ -96,11 +98,6 @@ class TTAppEventStorage {
             return false;
         }
         long initTimeMS = System.currentTimeMillis();
-//        try {
-//            JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-//                    .put("size", appEventPersist.getAppEvents().size());
-//            TikTokBusinessSdk.getAppEventLogger().monitorMetric("file_w_start", meta, null);
-//        } catch (Exception ignored) {}
         Context context = TikTokBusinessSdk.getApplicationContext();
         boolean success = false;
         try (ObjectOutputStream oos = new ObjectOutputStream(
@@ -111,23 +108,27 @@ class TTAppEventStorage {
                 TikTokBusinessSdk.diskListener.onDiskChange(appEventPersist.getAppEvents().size(), false);
             }
             success = true;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
         }
         try {
             long endTimeMS = System.currentTimeMillis();
-            JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-                    .put("latency", endTimeMS-initTimeMS)
-                    .put("success", success)
-                    .put("size", appEventPersist.getAppEvents().size());
+            JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+            JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+            JSON.putBoolean(meta, "success", success);
+            JSON.putInt(meta, "size", appEventPersist.getAppEvents().size());
             TikTokBusinessSdk.getAppEventLogger().monitorMetric("file_w", meta, null);
-        } catch (Exception ignored) {}
-        return  success;
+        } catch (Throwable ignored) {
+        }
+        return success;
     }
 
     private static void deleteFile(File f) {
-        if (f.exists()) {
-            f.delete();
+        try {
+            if (f.exists()) {
+                f.delete();
+            }
+        } catch (Throwable ignore) {
         }
     }
 
@@ -150,18 +151,19 @@ class TTAppEventStorage {
             if (TikTokBusinessSdk.diskListener != null) {
                 TikTokBusinessSdk.diskListener.onDiskChange(0, true);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             deleteFile(f);
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
         }
 
         try {
             long endTimeMS = System.currentTimeMillis();
-            JSONObject meta = TTUtil.getMetaWithTS(endTimeMS)
-                    .put("latency", endTimeMS-initTimeMS)
-                    .put("size", appEventPersist.getAppEvents().size());
+            JSONObject meta = TTUtil.getMetaWithTS(endTimeMS);
+            JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+            JSON.putInt(meta, "size", appEventPersist.getAppEvents().size());
             TikTokBusinessSdk.getAppEventLogger().monitorMetric("file_r", meta, null);
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {
+        }
 
         return appEventPersist;
     }
@@ -169,9 +171,12 @@ class TTAppEventStorage {
     public synchronized static void clearAll() {
         TTUtil.checkThread(TAG);
 
-        Context context = TikTokBusinessSdk.getApplicationContext();
-        File f = new File(context.getFilesDir(), EVENT_STORAGE_FILE);
-        deleteFile(f);
+        try {
+            Context context = TikTokBusinessSdk.getApplicationContext();
+            File f = new File(context.getFilesDir(), EVENT_STORAGE_FILE);
+            deleteFile(f);
+        } catch (Throwable ignore) {
+        }
         if (TikTokBusinessSdk.diskListener != null) {
             TikTokBusinessSdk.diskListener.onDiskChange(0, true);
         }

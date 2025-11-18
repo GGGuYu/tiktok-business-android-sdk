@@ -152,20 +152,22 @@ class V5_V8BillingProxy implements IBillingProxy {
 
     private static void sendNoSkuIapTrack(List<String> skus, Purchase purchase) {
         try {
-            JSONArray contents = new JSONArray();
+            JSONArray contents = JSON.buildArr();
             for (String sku : skus) {
                 if (sku == null || sku.isEmpty()) {
                     continue;
                 }
-                JSONObject item = new JSONObject()
-                        .put("quantity", purchase.getQuantity())
-                        .put("content_id", sku);
-                contents.put(item);
+                JSONObject item = JSON.build();
+                JSON.putInt(item, "quantity", purchase.getQuantity());
+                JSON.putObject(item, "content_id", sku);
+
+                JSON.putArr(contents, item);
             }
-            JSONObject content = new JSONObject().put("contents", contents);
+            JSONObject content = JSON.build();
+            JSON.putObject(content, "contents", contents);
             TikTokBusinessSdk.trackEvent("Purchase", content);
-        } catch (Throwable ignored) {
-            ttLogger.error(ignored, "Track Purchase error");
+        } catch (Throwable e) {
+            ttLogger.error(e, "Track Purchase error");
         }
     }
 

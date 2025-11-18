@@ -6,21 +6,28 @@
 
 package com.tiktok.appevents;
 
+import static com.tiktok.util.TTConst.TTSDK_PREFIX;
+
 import android.content.Context;
+
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.HttpRequestUtil;
+import com.tiktok.util.JSON;
 import com.tiktok.util.TTLogger;
 import com.tiktok.util.TTUtil;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.tiktok.util.TTConst.TTSDK_PREFIX;
 
 /**
  * A global crash handler which mainly does
@@ -65,7 +72,8 @@ public class TTCrashHandler {
                 Context context = TikTokBusinessSdk.getApplicationContext();
                 File f = new File(context.getFilesDir(), CRASH_REPORT_FILE);
                 if (f.exists()) f.delete();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         crashReport = reportMonitor(crashReport);
         saveToFile(crashReport);
@@ -73,27 +81,32 @@ public class TTCrashHandler {
     }
 
     private static TTCrashReport reportMonitor(@NonNull TTCrashReport cr) {
-        if (cr.reports.size() == 0) return cr;
+        if (cr.reports == null || cr.reports.isEmpty()) return cr;
+
         TTCrashReport ttCrashReport = new TTCrashReport();
         // batch send monitor events
         for (int i = 0; i < cr.reports.size(); i += MONITOR_BATCH_MAX) {
             int j = i + MONITOR_BATCH_MAX;
             if (j > cr.reports.size()) j = cr.reports.size();
             List<TTCrashReport.Monitor> batch = cr.reports.subList(i, j);
-            List<JSONObject> batchReq = new ArrayList<>();
+            JSONArray batchReq = JSON.buildArr();
             for (TTCrashReport.Monitor m : batch) {
                 try {
-                    batchReq.add(new JSONObject(m.monitor));
-                } catch (Exception ignored) {}
+                    JSONObject js = JSON.build(m.monitor);
+                    if (js != null && js.length() > 0) {
+                        JSON.putArr(batchReq, js);
+                    }
+                } catch (Throwable ignored) {
+                }
             }
+
             JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
-            try {
-                req.put("batch", new JSONArray(batchReq));
-            } catch (Exception ignored) {}
+            JSON.putObject(req, "batch", batchReq);
+
             String resp = TTRequest.reportMonitorEvent(req);
             if (HttpRequestUtil.getCodeFromApi(resp) != 0) {
                 for (TTCrashReport.Monitor o : batch) {
-                    ttCrashReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt+1);
+                    ttCrashReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt + 1);
                 }
             }
         }
@@ -105,13 +118,16 @@ public class TTCrashHandler {
             public final String monitor;
             public long ts;
             public int attempt;
+
             public Monitor(String o, long t, int a) {
                 this.monitor = o;
                 this.ts = t;
                 this.attempt = a;
             }
         }
+
         List<Monitor> reports = new ArrayList<>();
+
         public void addReport(String o, long t, int a) {
             if (a < MONITOR_RETRY_LIMIT)
                 this.reports.add(new Monitor(o, t, a));
@@ -123,19 +139,19 @@ public class TTCrashHandler {
         try {
             stat = TTRequestBuilder.getHealthMonitorBase();
             JSONObject monitor = TTUtil.getMonitorException(ex, null, type);
-            stat.put("monitor", monitor);
+            JSON.putObject(stat, "monitor", monitor);
             crashReport.addReport(stat.toString(), System.currentTimeMillis(), 0);
             saveToFile(crashReport);
             crashReport = new TTCrashReport();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // exception during saving exception to file, post direct
             if (stat != null) {
-                List<JSONObject> batchReq = new ArrayList<>();
-                batchReq.add(stat);
+                JSONArray batchReq = JSON.buildArr();
+                JSON.putArr(batchReq, stat);
+                
                 JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
-                try {
-                    req.put("batch", new JSONArray(batchReq));
-                } catch (Exception ignored) {}
+                JSON.putObject(req, "batch", batchReq);
+
                 TTRequest.reportMonitorEvent(req);
             }
         }
@@ -162,7 +178,8 @@ public class TTCrashHandler {
             FileInputStream fis = context.openFileInput(CRASH_REPORT_FILE);
             meta = TTSafeReadObjectUtil.safeReadTTCrashHandler(fis);
             fis.close();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return meta;
     }
 

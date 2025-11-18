@@ -10,6 +10,7 @@ import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
 import android.content.Context;
 
+import com.tiktok.util.JSON;
 import com.tiktok.util.TTUtil;
 
 import org.json.JSONObject;
@@ -50,7 +51,7 @@ public class TTUserInfo implements Cloneable, Serializable {
                 result.append(Integer.toString((b & 0xff) + 0x100, 16).substring(1));
             }
             return result.toString();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
         }
         return null;
@@ -81,21 +82,21 @@ public class TTUserInfo implements Cloneable, Serializable {
     }
 
     public JSONObject toJsonObject() {
-        JSONObject jsonObject = new JSONObject();
+        JSONObject jsonObject = JSON.build();
         try {
             if (externalId != null) {
-                jsonObject.put("external_id", externalId);
+                JSON.putObject(jsonObject, "external_id", externalId);
             }
             if (externalUserName != null) {
-                jsonObject.put("external_username", externalUserName);
+                JSON.putObject(jsonObject, "external_username", externalUserName);
             }
             if (phoneNumber != null) {
-                jsonObject.put("phone_number", phoneNumber);
+                JSON.putObject(jsonObject, "phone_number", phoneNumber);
             }
             if (email != null) {
-                jsonObject.put("email", email);
+                JSON.putObject(jsonObject, "email", email);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
         }
         return jsonObject;
@@ -107,7 +108,7 @@ public class TTUserInfo implements Cloneable, Serializable {
     public TTUserInfo clone() {
         try {
             return (TTUserInfo) super.clone();
-        } catch (Exception e) {
+        } catch (Throwable ignore) {
             return new TTUserInfo();
         }
     }

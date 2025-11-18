@@ -28,6 +28,7 @@ import android.widget.TextView;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.appevents.edp.proxy.ITouchListener;
 import com.tiktok.appevents.edp.proxy.TouchProxyHelper;
+import com.tiktok.util.JSON;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,13 +37,14 @@ import java.lang.ref.WeakReference;
 
 public class TTHierarchyHelper {
     public static Handler mHandler;
+
     public static JSONObject getViewHierarchy(WeakReference<View> rootView, int hierarchy) {
-        JSONObject jsonObject = new JSONObject();
+        JSONObject jsonObject = JSON.build();
         try {
             if (hierarchy <= 0) {
                 return jsonObject;
             }
-            jsonObject.put("class_name", rootView.get().getClass().getCanonicalName());
+            JSON.putObject(jsonObject, "class_name", rootView.get().getClass().getCanonicalName());
             if (rootView.get() instanceof TextView) {
                 String text = "";
                 if (((TextView) rootView.get()).getText() != null) {
@@ -51,37 +53,32 @@ public class TTHierarchyHelper {
                 if (!TextUtils.isEmpty(text)) {
                     text = replaceAllToHash(sensig_filtering_regex_list, text);
                 }
-                jsonObject.put("text", text);
-                jsonObject.put("font_size", ((TextView) rootView.get()).getTextSize());
+                JSON.putObject(jsonObject, "text", text);
+                JSON.putDouble(jsonObject, "font_size", ((TextView) rootView.get()).getTextSize());
             }
             int[] location = new int[2];
             rootView.get().getLocationOnScreen(location);
-            jsonObject.put("left", location[0]);
-            jsonObject.put("top", location[1]);
-            jsonObject.put("width", rootView.get().getMeasuredWidth());
-            jsonObject.put("height", rootView.get().getMeasuredHeight());
-            jsonObject.put("scroll_x", rootView.get().getScrollX());
-            jsonObject.put("scroll_y", rootView.get().getScrollY());
+            JSON.putInt(jsonObject, "left", location[0]);
+            JSON.putInt(jsonObject, "top", location[1]);
+            JSON.putInt(jsonObject, "width", rootView.get().getMeasuredWidth());
+            JSON.putInt(jsonObject, "height", rootView.get().getMeasuredHeight());
+            JSON.putInt(jsonObject, "scroll_x", rootView.get().getScrollX());
+            JSON.putInt(jsonObject, "scroll_y", rootView.get().getScrollY());
             if (rootView.get() instanceof ViewGroup) {
-                JSONArray jsonArray = new JSONArray();
+                JSONArray jsonArray = JSON.buildArr();
                 for (int i = 0; i < ((ViewGroup) rootView.get()).getChildCount(); i++) {
-                    JSONObject jsonItem = getViewHierarchy((new WeakReference<>(((ViewGroup) (rootView.get())).getChildAt(i))), hierarchy-1);
-                    jsonArray.put(jsonItem);
+                    JSONObject jsonItem = getViewHierarchy((new WeakReference<>(((ViewGroup) (rootView.get())).getChildAt(i))), hierarchy - 1);
+                    JSON.putArr(jsonArray, jsonItem);
                 }
-                try {
-                    jsonObject.put("child_views", jsonArray);
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
+                JSON.putObject(jsonObject, "child_views", jsonArray);
             }
-        }catch (Throwable e){
-
+        } catch (Throwable ignore) {
         }
         return jsonObject;
     }
 
-    public static void proxyOnTouch(WeakReference<View> rootView, WeakReference<Activity> activity){
-        if(!enable_click_track) {
+    public static void proxyOnTouch(WeakReference<View> rootView, WeakReference<Activity> activity) {
+        if (!enable_click_track) {
             return;
         }
         TouchProxyHelper.proxy(rootView, new ITouchListener() {
@@ -101,10 +98,10 @@ public class TTHierarchyHelper {
                             if (button_black_list.contains(rootView.get().getClass().getCanonicalName())) {
                                 return false;
                             }
-                            if(!TTEDPEventTrack.checkUpload() || isSending){
+                            if (!TTEDPEventTrack.checkUpload() || isSending) {
                                 return false;
                             }
-                            if(System.currentTimeMillis() - LAST_CLICK_TS <= time_diff_frequency_control * 1000){
+                            if (System.currentTimeMillis() - LAST_CLICK_TS <= time_diff_frequency_control * 1000) {
                                 return false;
                             }
                             isSending = true;
@@ -125,15 +122,14 @@ public class TTHierarchyHelper {
                             });
                             break;
                     }
-                }catch (Throwable e){
-
+                } catch (Throwable ignore) {
                 }
                 return false;
             }
         });
     }
 
-    public static int getViewHierarchyCount(WeakReference<View> rootView){
+    public static int getViewHierarchyCount(WeakReference<View> rootView) {
         try {
             if (rootView.get() instanceof ViewGroup) {
                 int viewHierarchyCount = 1;
@@ -144,7 +140,7 @@ public class TTHierarchyHelper {
             } else {
                 return 1;
             }
-        }catch (Throwable e){
+        } catch (Throwable ignore) {
             return 0;
         }
     }
@@ -168,8 +164,7 @@ public class TTHierarchyHelper {
                                 if (!TextUtils.isEmpty(url)) {
                                     TTEDPEventTrack.trackWebviewRequest(url);
                                 }
-                            } catch (Throwable e) {
-
+                            } catch (Throwable ignore) {
                             }
                         }
                     });
@@ -202,7 +197,7 @@ public class TTHierarchyHelper {
             } else {
                 return 1;
             }
-        }catch (Throwable e){
+        } catch (Throwable ignore) {
             return 0;
         }
     }

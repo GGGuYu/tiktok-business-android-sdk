@@ -19,6 +19,7 @@ import android.text.TextUtils;
 
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.IOUtils;
+import com.tiktok.util.JSON;
 import com.tiktok.util.TTLogger;
 import com.tiktok.util.TTReflect;
 import com.tiktok.util.TTUtil;
@@ -89,9 +90,9 @@ public class TTIdentifierFactory {
     private static void sendMonitor(AdIdInfo info) {
         try {
             if (info != null) {
-                JSONObject meta = TTUtil.getMetaWithTS(null)
-                        .put("duration", info.duration)
-                        .put("from", info.from);
+                JSONObject meta = TTUtil.getMetaWithTS(null);
+                JSON.putLong(meta, "duration", info.duration);
+                JSON.putInt(meta, "from", info.from);
                 TikTokBusinessSdk.getAppEventLogger().monitorMetric("gaid_result", meta, null);
             }
         } catch (Throwable ignore) {

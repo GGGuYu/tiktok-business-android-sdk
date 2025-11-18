@@ -6,6 +6,8 @@
 
 package com.tiktok.appevents;
 
+import com.tiktok.util.JSON;
+
 import org.json.JSONObject;
 
 public class TTPurchaseInfo {
@@ -22,12 +24,12 @@ public class TTPurchaseInfo {
     }
 
     /**
-     * @param purchase for google billing v3, simply pass the purchase JSONObject.
-     *                 for v4, you may try using new JSONObject(purchase.getOriginalJson()
+     * @param purchase   for google billing v3, simply pass the purchase JSONObject.
+     *                   for v4, you may try using new JSONObject(purchase.getOriginalJson()
      * @param skuDetails for google billing v3, simply pass the skuDetails JSONObject.
      *                   for v4, you may try using new JSONObject(skuDetails.getOriginalJson()
      * @throws InvalidTTPurchaseInfoException if either the purchase or the skuDetails object are not valid
-     * or the productId does not match
+     *                                        or the productId does not match
      */
     public TTPurchaseInfo(JSONObject purchase, JSONObject skuDetails) throws InvalidTTPurchaseInfoException {
         if (!isValidPurchase(purchase)) {
@@ -36,7 +38,10 @@ public class TTPurchaseInfo {
         if (!isValidSkuDetails(skuDetails)) {
             throw new InvalidTTPurchaseInfoException("Not a valid skuDetails Object");
         }
-        if (!purchase.optString("productId").equals(skuDetails.optString("productId"))) {
+
+        String pid = JSON.getString(purchase, "productId");
+        String pidSKU = JSON.getString(skuDetails, "productId");
+        if (pid != null && !pid.equals(pidSKU)) {
             throw new InvalidTTPurchaseInfoException("Product Id does not match");
         }
         this.purchase = purchase;
@@ -74,15 +79,15 @@ public class TTPurchaseInfo {
     }
 
     /**
-     *{
-     *  "skuDetailsToken":"blahblah",
-     *  "productId":"android.test.purchased",
-     *  "type":"inapp",
-     *  "price":"₹72.41",
-     *  "price_amount_micros":72407614,
-     *  "price_currency_code":"INR",
-     *  "title":"Sample Title",
-     *  "description":"Sample description for product: android.test.purchased."
+     * {
+     * "skuDetailsToken":"blahblah",
+     * "productId":"android.test.purchased",
+     * "type":"inapp",
+     * "price":"₹72.41",
+     * "price_amount_micros":72407614,
+     * "price_currency_code":"INR",
+     * "title":"Sample Title",
+     * "description":"Sample description for product: android.test.purchased."
      * }
      */
     private boolean isValidSkuDetails(JSONObject skuDetails) {

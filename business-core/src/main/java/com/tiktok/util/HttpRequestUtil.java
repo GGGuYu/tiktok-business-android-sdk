@@ -8,14 +8,17 @@ package com.tiktok.util;
 
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_NET_ERROR;
 
+import android.text.TextUtils;
+
 import androidx.annotation.Nullable;
+
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.appevents.TTCrashHandler;
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -27,12 +30,15 @@ import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.HttpsURLConnection;
 
 public class HttpRequestUtil {
-
+    private static final String TAG = "HttpRequestUtil";
     private static final String MONITOR_API_TYPE = "monitor";
     private static final String API_ERR = "api_err";
 
+    private static final TTLogger ttLogger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
+
+
     public static class HttpRequestOptions {
-        private static int UNSET = -1;
+        private static final int UNSET = -1;
         public int connectTimeout = UNSET;
         public int readTimeout = UNSET;
 
@@ -46,10 +52,6 @@ public class HttpRequestUtil {
         }
     }
 
-    private static final String TAG = HttpRequestUtil.class.getCanonicalName();
-
-    private static final TTLogger ttLogger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
-
     public static HttpsURLConnection connect(String url, Map<String, String> headerParamMap, HttpRequestOptions options, String method, String contentLength) {
         HttpsURLConnection connection = null;
 
@@ -60,26 +62,31 @@ public class HttpRequestUtil {
             options.configConnection(connection);
             connection.setDoInput(true);
             connection.setUseCaches(false);
-            if(method.equals("GET")) {
+            if (method.equals("GET")) {
                 connection.setDoOutput(false);
-            } else if(method.equals("POST")) {
+            } else if (method.equals("POST")) {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Length", contentLength);
             }
 
-            for (Map.Entry<String, String> entry : headerParamMap.entrySet()) {
-                connection.setRequestProperty(entry.getKey(), entry.getValue());
+            if (headerParamMap != null && !headerParamMap.isEmpty()) {
+                for (Map.Entry<String, String> entry : headerParamMap.entrySet()) {
+                    final String key = entry.getKey();
+                    final String value = entry.getValue();
+                    if (!TextUtils.isEmpty(key) && !TextUtils.isEmpty(value)) {
+                        connection.setRequestProperty(key, value);
+                    }
+                }
             }
-            connection.setRequestProperty("Content-Encoding","gzip");
+            connection.setRequestProperty("Content-Encoding", "gzip");
 
             connection.connect();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_NET_ERROR);
             if (connection != null) {
                 try {
                     connection.disconnect();
-                }catch (Exception exc){
-                    TTCrashHandler.handleCrash(TAG, exc, TTSDK_EXCEPTION_NET_ERROR);
+                } catch (Throwable ignore) {
                 }
             }
         }
@@ -88,11 +95,10 @@ public class HttpRequestUtil {
 
     public static boolean shouldRedirect(int status) {
         if (status != HttpURLConnection.HTTP_OK) {
-            if (status == HttpURLConnection.HTTP_MOVED_TEMP
+            return status == HttpURLConnection.HTTP_MOVED_TEMP
                     || status == HttpURLConnection.HTTP_MOVED_PERM
                     || status == HttpURLConnection.HTTP_SEE_OTHER
-                    || status == 307)
-                return true;
+                    || status == 307;
         }
         return false;
     }
@@ -106,12 +112,12 @@ public class HttpRequestUtil {
         try {
             URL uri = new URL(url);
             apiType = uri.getPath().split("/app_sdk/")[1];
-        } catch (Throwable ignored) {
-            message = ignored.getMessage();
+        } catch (Throwable e) {
+            message = e.getMessage();
         }
         HttpsURLConnection connection = connect(url, headerParamMap, options, "GET", null);
-        if (connection == null) return result;
-        try{
+        if (connection == null) return null;
+        try {
             boolean redirect = shouldRedirect(connection.getResponseCode());
             if (redirect) {
                 String redirectUrl = connection.getHeaderField("Location");
@@ -123,16 +129,14 @@ public class HttpRequestUtil {
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 result = streamToString(connection.getInputStream());
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             message = e.getMessage();
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_NET_ERROR);
         } finally {
             if (connection != null) {
                 try {
                     connection.disconnect();
-                } catch (Exception e) {
-                    message = e.getMessage();
-                    TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_NET_ERROR);
+                } catch (Throwable ignore) {
                 }
             }
         }
@@ -140,20 +144,20 @@ public class HttpRequestUtil {
         try {
             int dataCodeFromApi = getCodeFromApi(result);
             if (dataCodeFromApi != 0) {
-
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     responseCode = dataCodeFromApi;
                     message = getMessageFromApi(result);
                 }
-                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-                        .put("latency", endTimeMS-initTimeMS)
-                        .put("api_type", apiType)
-                        .put("status_code", responseCode)
-                        .put("message", message)
-                        .put("log_id", getLogIDFromApi(result));
+                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+                JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+                JSON.putObject(meta, "api_type", apiType);
+                JSON.putInt(meta, "status_code", responseCode);
+                JSON.putObject(meta, "message", message);
+                JSON.putObject(meta, "log_id", getLogIDFromApi(result));
                 TikTokBusinessSdk.getAppEventLogger().monitorMetric(API_ERR, meta, null);
             }
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {
+        }
         return result;
     }
 
@@ -177,25 +181,25 @@ public class HttpRequestUtil {
         try {
             URL uri = new URL(url);
             apiType = uri.getPath().split("/app_sdk/")[1];
-        } catch (Throwable ignored) {
-            message = ignored.getMessage();
+        } catch (Throwable e) {
+            message = e.getMessage();
         }
 
         HttpURLConnection connection = null;
         OutputStream outputStream = null;
 
         try {
-            if(needSignature){
+            if (needSignature) {
                 String securityKey = DecryptUtil.encryptWithHmac(jsonStr);
                 headerParamMap.put("X-TT-Signature", securityKey);
-            }else {
+            } else {
                 headerParamMap.remove("X-TT-Signature");
             }
             byte[] writeBytes = compress2Gzip(jsonStr);
             String contentLength = String.valueOf(writeBytes.length);
 
             connection = connect(url, headerParamMap, options, "POST", contentLength);
-            if (connection == null) return result;
+            if (connection == null) return null;
             outputStream = connection.getOutputStream();
             outputStream.write(writeBytes);
             outputStream.flush();
@@ -214,7 +218,7 @@ public class HttpRequestUtil {
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 result = streamToString(connection.getInputStream());
             }
-            if(TikTokBusinessSdk.isInSdkDebugMode()) {
+            if (TikTokBusinessSdk.isInSdkDebugMode()) {
                 ttLogger.info("doPost request body: %s", jsonStr);
                 ttLogger.info("doPost result: %s", result == null ? String.valueOf(responseCode) : result);
             }
@@ -225,17 +229,13 @@ public class HttpRequestUtil {
             if (outputStream != null) {
                 try {
                     outputStream.close();
-                } catch (Throwable e) {
-                    message = e.getMessage();
-                    TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_NET_ERROR);
+                } catch (Throwable ignore) {
                 }
             }
             if (connection != null) {
                 try {
                     connection.disconnect();
-                } catch (Throwable e){
-                    message = e.getMessage();
-                    TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_NET_ERROR);
+                } catch (Throwable ignore) {
                 }
             }
         }
@@ -249,20 +249,21 @@ public class HttpRequestUtil {
                 }
             }
             if (dataCodeFromApi != 0 && !url.contains(MONITOR_API_TYPE)) {
-                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-                        .put("latency", endTimeMS-initTimeMS)
-                        .put("api_type", apiType)
-                        .put("status_code", responseCode)
-                        .put("message", message)
-                        .put("log_id", getLogIDFromApi(result));
+                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+                JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+                JSON.putObject(meta, "api_type", apiType);
+                JSON.putInt(meta, "status_code", responseCode);
+                JSON.putObject(meta, "message", message);
+                JSON.putObject(meta, "log_id", getLogIDFromApi(result));
                 TikTokBusinessSdk.getAppEventLogger().monitorMetric(API_ERR, meta, null);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
         return result;
     }
 
     private static byte[] compress2Gzip(String requestBody) {
-        if (null == requestBody || requestBody.length() == 0) {
+        if (TextUtils.isEmpty(requestBody)) {
             return null;
         }
         ByteArrayOutputStream outputStream = null;
@@ -272,22 +273,23 @@ public class HttpRequestUtil {
             outputStream = new ByteArrayOutputStream();
             gzipOutputStream = new GZIPOutputStream(outputStream);
             gzipOutputStream.write(requestBody.getBytes("utf-8"));
-        } catch (IOException e) {
+        } catch (Throwable e) {
             ttLogger.error(e, e.toString());
         } finally {
-            if (gzipOutputStream != null){
+            if (gzipOutputStream != null) {
                 try {
                     gzipOutputStream.close();
-                } catch (IOException e) {
-                    ttLogger.error(e, e.toString());
+                } catch (Throwable ignore) {
                 }
             }
-            if (outputStream != null){
-                bytes = outputStream.toByteArray();
+            if (outputStream != null) {
+                try {
+                    bytes = outputStream.toByteArray();
+                } catch (Throwable ignore) {
+                }
                 try {
                     outputStream.close();
-                } catch (IOException e) {
-                    ttLogger.error(e, e.toString());
+                } catch (Throwable ignore) {
                 }
             }
         }
@@ -302,7 +304,7 @@ public class HttpRequestUtil {
                 sb.append(line);
             }
             return sb.toString().trim();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_NET_ERROR);
         }
         return null;
@@ -311,9 +313,9 @@ public class HttpRequestUtil {
     public static int getCodeFromApi(@Nullable String resp) {
         if (resp != null) {
             try {
-                JSONObject respJson = new JSONObject(resp);
-                return respJson.getInt("code");
-            } catch (Exception ignored) {
+                JSONObject respJson = JSON.build(resp);
+                return JSON.getInt(respJson, "code", -1);
+            } catch (Throwable ignored) {
                 return -2;
             }
         }
@@ -323,10 +325,10 @@ public class HttpRequestUtil {
     public static String getMessageFromApi(@Nullable String resp) {
         if (resp != null) {
             try {
-                JSONObject respJson = new JSONObject(resp);
-                return respJson.getString("message");
-            } catch (Exception ignored) {
-                return ignored.getMessage();
+                JSONObject respJson = JSON.build(resp);
+                return JSON.getString(respJson, "message");
+            } catch (Throwable e) {
+                return e.getMessage();
             }
         }
         return "result is empty";
@@ -335,9 +337,9 @@ public class HttpRequestUtil {
     public static String getLogIDFromApi(@Nullable String resp) {
         if (resp != null) {
             try {
-                JSONObject respJson = new JSONObject(resp);
-                return respJson.getString("request_id");
-            } catch (Exception ignored) {
+                JSONObject respJson = JSON.build(resp);
+                return JSON.getString(respJson, "request_id");
+            } catch (Throwable ignored) {
                 return null;
             }
         }
