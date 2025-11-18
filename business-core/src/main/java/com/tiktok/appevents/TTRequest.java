@@ -8,6 +8,8 @@ package com.tiktok.appevents;
 
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
+import android.net.Uri;
+import android.os.Build;
 import android.text.TextUtils;
 
 import com.tiktok.BuildConfig;
@@ -101,7 +103,7 @@ class TTRequest {
             logger.error(e, e.getMessage());
         }
 
-        String url = "https://analytics.us.tiktok.com/api/v1/app_sdk/config";
+        String url = "https://analytics.us.tiktok.com/api/v1/app_sdk/cache/config";
         logger.debug(url);
         if (TextUtils.isEmpty(TikTokBusinessSdk.getTTAppId()) || TextUtils.isEmpty(TikTokBusinessSdk.getAppId())) {
             try {
@@ -117,6 +119,24 @@ class TTRequest {
             JSON.putBoolean(result, "enable_sdk", false);
             return result;
         }
+
+        //handle cache query
+        try {
+            final String ttAppId = TikTokBusinessSdk.getTTAppId();
+            url = Uri.parse(url).buildUpon()
+                    .appendQueryParameter("tiktok_app_id", ttAppId == null ? "" : ttAppId)
+                    .appendQueryParameter("sdk_version", SystemInfoUtil.getSDKVersion())
+                    .appendQueryParameter("platform", "Android")
+                    .appendQueryParameter("model", Build.MODEL)
+                    .appendQueryParameter("app_version", SystemInfoUtil.getAppVersionName())
+                    .appendQueryParameter("os_version", SystemInfoUtil.getAndroidVersion())
+                    .appendQueryParameter("locale", SystemInfoUtil.getBcp47Language())
+                    .appendQueryParameter("namespace", SystemInfoUtil.getPackageName())
+                    .build()
+                    .toString();
+        } catch (Throwable ignore) {
+        }
+
         String result = HttpRequestUtil.doPost(url, getHeadParamMap, jsonObject.toString(), false);
         logger.debug(result);
         JSONObject config = null;
