@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TTAppEvent implements Serializable {
 
-    public static enum TTAppEventType{
+    public static enum TTAppEventType {
         track,
         identify
     }
@@ -36,7 +36,7 @@ public class TTAppEvent implements Serializable {
     private String propertiesJson;
     private String eventId;
     private Boolean isEdp;
-    private static AtomicLong counter = new AtomicLong(new Date().getTime() + 0L);
+    private static final AtomicLong counter = new AtomicLong(new Date().getTime());
     private Long uniqueId;
     private TTUserInfo userInfo;
     private String screenShot;
@@ -78,7 +78,7 @@ public class TTAppEvent implements Serializable {
         return eventName;
     }
 
-    public String getType(){
+    public String getType() {
         return this.type.name();
     }
 

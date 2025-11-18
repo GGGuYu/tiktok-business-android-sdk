@@ -8,6 +8,7 @@ package com.tiktok;
 
 import static com.tiktok.appevents.ErrorData.TT_DDL_CODE_NOT_INIT;
 import static com.tiktok.appevents.ErrorData.TT_DDL_MSG_NOT_INIT;
+import static com.tiktok.util.TTConst.ERROR_MESSAGE_INVALID_ID;
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_CRASH;
 
 import android.app.Application;
@@ -186,6 +187,14 @@ public class TikTokBusinessSdk {
 
     public static void initializeSdk(TTConfig ttConfig, final TTInitCallback callback) {
         if (ttSdk != null || ttConfig == null) return;
+
+        if (TextUtils.isEmpty(ttConfig.ttAppId) || TextUtils.isEmpty(ttConfig.appId)) {
+            if (callback != null) {
+                callback.fail(INVALID_ID, ERROR_MESSAGE_INVALID_ID);
+            }
+            return;
+        }
+
         long initTimeMS = System.currentTimeMillis();
         try {
             Thread.UncaughtExceptionHandler existingExHandler = Thread.getDefaultUncaughtExceptionHandler();
@@ -203,7 +212,7 @@ public class TikTokBusinessSdk {
                     }
                 }
             });
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
             // SecurityException
         }
 
@@ -222,7 +231,7 @@ public class TikTokBusinessSdk {
             JSONObject meta = TTUtil.getMetaWithTS(null);
             JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
             appEventLogger.monitorMetric("init_end", meta, null);
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
         }
     }
 

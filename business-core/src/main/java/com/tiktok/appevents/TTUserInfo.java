@@ -19,7 +19,7 @@ import java.io.Serializable;
 import java.security.MessageDigest;
 
 public class TTUserInfo implements Cloneable, Serializable {
-    static final String TAG = TTUserInfo.class.getName();
+    static final String TAG = "TTUserInfo";
     String anonymousId;
     String externalId;
     String externalUserName;
@@ -27,7 +27,7 @@ public class TTUserInfo implements Cloneable, Serializable {
     String email;
     transient boolean isIdentified = false;
 
-    public static volatile TTUserInfo sharedInstance = new TTUserInfo();
+    public static final TTUserInfo sharedInstance = new TTUserInfo();
 
     // clear the previous userInfo, useful when logging out
     public static void reset(Context context, boolean forceGenerateAnoId) {

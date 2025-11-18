@@ -31,8 +31,6 @@ import java.util.Locale;
 
 class TTAutoEventsManager {
 
-    private static final String TAG = TTAutoEventsManager.class.getCanonicalName();
-
     private static final SimpleDateFormat dateFormat;
     private static final SimpleDateFormat timeFormat;
 

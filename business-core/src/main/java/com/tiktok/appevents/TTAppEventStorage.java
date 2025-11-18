@@ -11,6 +11,7 @@ import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 import android.content.Context;
 
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.util.IOUtils;
 import com.tiktok.util.JSON;
 import com.tiktok.util.TTLogger;
 import com.tiktok.util.TTUtil;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 class TTAppEventStorage {
-    private static final String TAG = TTAppEventStorage.class.getCanonicalName();
+    private static final String TAG = "TTAppEventStorage";
 
     private static final TTLogger logger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
 
@@ -41,40 +42,41 @@ class TTAppEventStorage {
     public synchronized static void persist(List<TTAppEvent> failedEvents) {
         TTUtil.checkThread(TAG);
 
-        logger.debug("Tried to persist to disk");
-        if (!TikTokBusinessSdk.isSystemActivated()) {
-            logger.debug("Quit persisting to disk because global switch is turned off");
-            return;
+        try {
+            logger.debug("Tried to persist to disk");
+            if (!TikTokBusinessSdk.isSystemActivated()) {
+                logger.debug("Quit persisting to disk because global switch is turned off");
+                return;
+            }
+
+            List<TTAppEvent> eventsFromMemory = TTAppEventsQueue.exportAllEvents();
+
+            TTAppEventPersist eventsFromDisk = readFromDisk();
+
+            if (eventsFromMemory.isEmpty() && eventsFromDisk.isEmpty() &&
+                    (failedEvents == null || failedEvents.isEmpty())) {
+                return;
+            }
+
+            TTAppEventPersist toBeSaved = new TTAppEventPersist();
+            // maintain events ordering, the events in the network should be earlier than the
+            // events on the disk, finally come the events in the memory
+            if (failedEvents != null) {
+                toBeSaved.addEvents(failedEvents);
+            }
+            toBeSaved.addEvents(eventsFromDisk.getAppEvents());
+            toBeSaved.addEvents(eventsFromMemory);
+
+            //If end up persisting more than 500 events, persist the latest 500 events by timestamp
+            discardOldEvents(toBeSaved, MAX_PERSIST_EVENTS_NUM);
+            saveToDisk(toBeSaved);
+        } catch (Throwable ignore) {
         }
-
-        List<TTAppEvent> eventsFromMemory = TTAppEventsQueue.exportAllEvents();
-
-        TTAppEventPersist eventsFromDisk = readFromDisk();
-
-        if (eventsFromMemory.isEmpty() && eventsFromDisk.isEmpty() &&
-                (failedEvents == null || failedEvents.isEmpty())) {
-            return;
-        }
-
-        TTAppEventPersist toBeSaved = new TTAppEventPersist();
-        // maintain events ordering, the events in the network should be earlier than the
-        // events on the disk, finally come the events in the memory
-        if (failedEvents != null) {
-            toBeSaved.addEvents(failedEvents);
-        }
-        toBeSaved.addEvents(eventsFromDisk.getAppEvents());
-        toBeSaved.addEvents(eventsFromMemory);
-
-        //If end up persisting more than 500 events, persist the latest 500 events by timestamp
-        discardOldEvents(toBeSaved, MAX_PERSIST_EVENTS_NUM);
-        saveToDisk(toBeSaved);
     }
 
     /**
      * discard old events
      * In order not to overwhelm users' disk, only maxPersistNum is allowed to be persisted to disk
-     *
-     * @param ttAppEventPersist
      */
     private static void discardOldEvents(TTAppEventPersist ttAppEventPersist, int maxPersistNum) {
         if (ttAppEventPersist == null || ttAppEventPersist.isEmpty()) {
@@ -100,8 +102,9 @@ class TTAppEventStorage {
         long initTimeMS = System.currentTimeMillis();
         Context context = TikTokBusinessSdk.getApplicationContext();
         boolean success = false;
-        try (ObjectOutputStream oos = new ObjectOutputStream(
-                new BufferedOutputStream(context.openFileOutput(EVENT_STORAGE_FILE, Context.MODE_PRIVATE)))) {
+        ObjectOutputStream oos = null;
+        try {
+            oos = new ObjectOutputStream(new BufferedOutputStream(context.openFileOutput(EVENT_STORAGE_FILE, Context.MODE_PRIVATE)));
             oos.writeObject(appEventPersist);
             logger.debug("Saving %d events to disk", appEventPersist.getAppEvents().size());
             if (TikTokBusinessSdk.diskListener != null) {
@@ -110,6 +113,8 @@ class TTAppEventStorage {
             success = true;
         } catch (Throwable e) {
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
+        } finally {
+            IOUtils.close(oos);
         }
         try {
             long endTimeMS = System.currentTimeMillis();
@@ -144,7 +149,9 @@ class TTAppEventStorage {
 
         TTAppEventPersist appEventPersist = new TTAppEventPersist();
 
-        try (FileInputStream ois = context.openFileInput(EVENT_STORAGE_FILE)) {
+        FileInputStream ois = null;
+        try {
+            ois = context.openFileInput(EVENT_STORAGE_FILE);
             appEventPersist = TTSafeReadObjectUtil.safeReadTTAppEventPersist(ois);
             logger.debug("disk read data: %s", appEventPersist);
             deleteFile(f);
@@ -154,6 +161,8 @@ class TTAppEventStorage {
         } catch (Throwable e) {
             deleteFile(f);
             TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
+        } finally {
+            IOUtils.close(ois);
         }
 
         try {

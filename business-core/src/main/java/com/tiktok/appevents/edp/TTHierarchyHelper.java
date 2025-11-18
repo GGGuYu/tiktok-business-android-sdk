@@ -36,7 +36,7 @@ import org.json.JSONObject;
 import java.lang.ref.WeakReference;
 
 public class TTHierarchyHelper {
-    public static Handler mHandler;
+    public static volatile Handler mHandler;
 
     public static JSONObject getViewHierarchy(WeakReference<View> rootView, int hierarchy) {
         JSONObject jsonObject = JSON.build();
@@ -147,7 +147,11 @@ public class TTHierarchyHelper {
 
     public static Handler getHandler() {
         if (mHandler == null) {
-            mHandler = new Handler(Looper.getMainLooper());
+            synchronized (TTHierarchyHelper.class) {
+                if (mHandler == null) {
+                    mHandler = new Handler(Looper.getMainLooper());
+                }
+            }
         }
         return mHandler;
     }

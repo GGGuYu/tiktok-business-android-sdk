@@ -152,8 +152,10 @@ public class TTEDPEventTrack {
         }
     }
 
+    private static final Random sRandom = new Random();
+
     public static boolean checkUpload() {
-        return new Random().nextDouble() <= report_frequency_control;
+        return sRandom.nextDouble() <= report_frequency_control;
     }
 
 }

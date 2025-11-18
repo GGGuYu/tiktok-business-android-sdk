@@ -343,6 +343,9 @@ class TTRequest {
      */
     public static <T> List<List<T>> averageAssign(List<T> sourceList, int splitNum) {
         List<List<T>> result = new ArrayList<>();
+        if (sourceList == null || sourceList.isEmpty()) {
+            return result;
+        }
 
         try {
             List<T> splitList = new ArrayList<>();
@@ -359,6 +362,7 @@ class TTRequest {
                 }
             }
         } catch (Throwable ignore) {
+            result.add(sourceList);
         }
 
         return result;
