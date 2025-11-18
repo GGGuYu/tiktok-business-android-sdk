@@ -252,6 +252,7 @@ class TTRequestBuilder {
             JSON.putDouble(device, "scale", SystemInfoUtil.getsDensity());
             JSON.putObject(device, "model", Build.MODEL);
             JSON.putObject(device, "version", Build.VERSION.RELEASE);
+            JSON.putObject(device, "installer_package", SystemInfoUtil.getInstallSource());
         } catch (Throwable ignore) {
         }
     }

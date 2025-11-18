@@ -13,6 +13,7 @@ import static com.tiktok.util.TTConst.TTSDK_USER_AGENT;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.pm.InstallSourceInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
@@ -461,4 +462,39 @@ public class SystemInfoUtil {
         }
         return null;
     }
+
+    private static String sInstallSource;
+
+    private static void initInstallSource() {
+        try {
+            Context context = TikTokBusinessSdk.getApplicationContext();
+            if (context == null) {
+                return;
+            }
+
+            final PackageManager pm = context.getPackageManager();
+            final String pkgName = getPackageName();
+            if (pm == null || TextUtils.isEmpty(pkgName)) {
+                return;
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                InstallSourceInfo install = pm.getInstallSourceInfo(pkgName);
+                sInstallSource = install.getInitiatingPackageName();
+            } else {
+                sInstallSource = pm.getInstallerPackageName(pkgName);
+            }
+        } catch (Throwable ignore) {
+            sInstallSource = "Unknown";
+        }
+    }
+
+    public static String getInstallSource() {
+        if (TextUtils.isEmpty(sInstallSource)) {
+            initInstallSource();
+        }
+
+        return TextUtils.isEmpty(sInstallSource) ? "Unknown" : sInstallSource;
+    }
+
 }
