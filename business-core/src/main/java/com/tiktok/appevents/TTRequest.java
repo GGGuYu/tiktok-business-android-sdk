@@ -14,6 +14,7 @@ import android.text.TextUtils;
 
 import com.tiktok.BuildConfig;
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.util.HttpRequestUtil;
 import com.tiktok.util.JSON;
 import com.tiktok.util.SystemInfoUtil;
@@ -70,40 +71,7 @@ class TTRequest {
         long initTimeMS = System.currentTimeMillis();
 //        TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api_start", TTUtil.getMetaWithTS(initTimeMS), null);
         logger.info("Try to fetch global configs");
-        JSONObject jsonObject = JSON.build();
-        try {
-            JSONObject app = JSON.build();
-            JSON.putObject(app, "id", TikTokBusinessSdk.getAppId());
-            JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
-            JSON.putObject(app, "version", SystemInfoUtil.getAppVersionName());
-
-            JSON.putObject(jsonObject, "app", app);
-
-            JSONObject device = JSON.build();
-            JSON.putObject(device, "platform", "Android");
-            JSON.putObject(device, "version", SystemInfoUtil.getAndroidVersion());
-            if (TikTokBusinessSdk.isGaidCollectionEnabled()) {
-                try {
-                    TTIdentifierFactory.AdIdInfo adIdInfo = TTIdentifierFactory.getGoogleAdIdInfo(TikTokBusinessSdk.getApplicationContext());
-                    JSON.putObject(device, "gaid", adIdInfo.getAdId());
-                } catch (Throwable ignore) {
-                }
-            }
-
-            JSON.putObject(jsonObject, "device", device);
-            if (TikTokBusinessSdk.isInSdkDebugMode()) {
-                JSON.putObject(jsonObject, "debug", "true");
-            }
-
-            JSONObject library = JSON.build();
-            JSON.putObject(library, "name", "tiktok/" + SystemInfoUtil.getLibraryName());
-            JSON.putObject(library, "version", SystemInfoUtil.getSDKVersion());
-            JSON.putBoolean(library, "smart_sdk_client_flag", TikTokBusinessSdk.isEdpEnable());
-
-            JSON.putObject(jsonObject, "library", library);
-        } catch (Throwable e) {
-            logger.error(e, e.getMessage());
-        }
+        JSONObject jsonObject = buildConfigParams();
 
         String url = UrlConst.getConfigUrl();
 
@@ -167,6 +135,45 @@ class TTRequest {
         }
         // might be api returning something wrong
         return config;
+    }
+
+    public static JSONObject buildConfigParams() {
+        JSONObject jsonObject = JSON.build();
+        try {
+            JSONObject app = JSON.build();
+            JSON.putObject(app, "id", TikTokBusinessSdk.getAppId());
+            JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
+            JSON.putObject(app, "version", SystemInfoUtil.getAppVersionName());
+
+            JSON.putObject(jsonObject, "app", app);
+
+            JSONObject device = JSON.build();
+            JSON.putObject(device, "platform", "Android");
+            JSON.putObject(device, "version", SystemInfoUtil.getAndroidVersion());
+            if (TikTokBusinessSdk.isGaidCollectionEnabled()) {
+                try {
+                    TTIdentifierFactory.AdIdInfo adIdInfo = TTIdentifierFactory.getGoogleAdIdInfo(TikTokBusinessSdk.getApplicationContext());
+                    JSON.putObject(device, "gaid", adIdInfo.getAdId());
+                } catch (Throwable ignore) {
+                }
+            }
+
+            JSON.putObject(jsonObject, "device", device);
+            if (TikTokBusinessSdk.isInSdkDebugMode()) {
+                JSON.putObject(jsonObject, "debug", "true");
+            }
+
+            JSONObject library = JSON.build();
+            JSON.putObject(library, "name", "tiktok/" + SystemInfoUtil.getLibraryName());
+            JSON.putObject(library, "version", SystemInfoUtil.getSDKVersion());
+            JSON.putBoolean(library, "smart_sdk_client_flag", TikTokBusinessSdk.isEdpEnable());
+            JSON.putInt(library, "auto_iap_track_config", TTInAppPurchaseWrapper.devAutoTrack);
+
+            JSON.putObject(jsonObject, "library", library);
+        } catch (Throwable ignore) {
+        }
+
+        return jsonObject;
     }
 
     // for debugging purpose

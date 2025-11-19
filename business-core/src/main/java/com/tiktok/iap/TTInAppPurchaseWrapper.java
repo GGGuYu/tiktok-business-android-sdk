@@ -8,7 +8,6 @@ package com.tiktok.iap;
 
 import android.app.Activity;
 
-import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.iap.billing.client.IBillingProxy;
 import com.tiktok.iap.billing.client.TTBillingFactory;
 import com.tiktok.util.JSON;
@@ -24,6 +23,9 @@ import java.util.concurrent.Executors;
 
 public class TTInAppPurchaseWrapper {
     public static final ExecutorService sExecutor = Executors.newSingleThreadExecutor();
+
+    public static volatile int devAutoTrack = 0;//default0、1open、2close
+
     public static volatile boolean autoTrackPaymentEnable = true;
     public static Set<Integer> autoTrackPaymentTypes = new CopyOnWriteArraySet<>();
     public static volatile boolean autoTrackPaymentJson = true;
@@ -43,7 +45,7 @@ public class TTInAppPurchaseWrapper {
 
     public static void registerIapTrack() {
         try {
-            if (autoTrackPaymentEnable && TikTokBusinessSdk.enableAutoIapTrack()) {
+            if (autoTrackPaymentEnable) {
                 sExecutor.submit(new TTSafeRunnable() {
                     @Override
                     public void doSafeRun() {
@@ -112,6 +114,9 @@ public class TTInAppPurchaseWrapper {
             }
         } catch (Throwable ignore) {
         }
+
+        //register iap track
+        registerIapTrack();
     }
 
     public static boolean canTrackINAPP() {

@@ -73,7 +73,7 @@ class V5_V8BillingProxy implements IBillingProxy {
     }
 
     private boolean isAutoIAPTrackEnable() {
-        return TikTokBusinessSdk.enableAutoIapTrack() && TTInAppPurchaseWrapper.autoTrackPaymentEnable;
+        return TTInAppPurchaseWrapper.autoTrackPaymentEnable;
     }
 
     private void sendPurchase(BillingResult billingResult, List<Purchase> list) {

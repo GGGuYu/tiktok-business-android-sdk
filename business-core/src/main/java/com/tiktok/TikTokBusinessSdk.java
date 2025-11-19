@@ -154,6 +154,7 @@ public class TikTokBusinessSdk {
             testEventCode = createTestEventCode(ttConfig);
         }
         sdkLDUModeSwitch.set(ttConfig.lduModeSwitch);
+        TTInAppPurchaseWrapper.devAutoTrack = config.autoIapTrack;
     }
 
     public static void registerEDPLifecycleCallback(Application context) {
@@ -222,9 +223,6 @@ public class TikTokBusinessSdk {
         appEventLogger = new TTAppEventLogger(ttConfig.autoEvent, ttConfig.disabledEvents,
                 ttConfig.flushTime, ttConfig.disableMetrics);
         appEventLogger.initConfig(initTimeMS, callback, sdkInitialized);
-
-        //register iap track
-        TTInAppPurchaseWrapper.registerIapTrack();
 
         try {
             long endTimeMS = System.currentTimeMillis();
@@ -786,8 +784,8 @@ public class TikTokBusinessSdk {
         private boolean debugModeSwitch = false;
         /* open LDU mode*/
         private boolean lduModeSwitch = false;
-
-        private boolean autoIapTrack = true;
+        /*default0、1open、2close*/
+        private int autoIapTrack = 0;
         /* to enable auto EDP event tracking */
         private boolean autoEDPEvent = true;
 
@@ -946,12 +944,20 @@ public class TikTokBusinessSdk {
          * to open the Auto In App Purchase Track
          */
         public TTConfig enableAutoIapTrack() {
-            autoIapTrack = true;
+            autoIapTrack = 1;
+            return this;
+        }
+
+        /**
+         * to close the Auto In App Purchase Track
+         */
+        public TTConfig disableAutoIapTrack() {
+            autoIapTrack = 2;
             return this;
         }
 
         public boolean isAutoIapTrack() {
-            return autoIapTrack;
+            return autoIapTrack == 0 || autoIapTrack == 1;
         }
     }
 
