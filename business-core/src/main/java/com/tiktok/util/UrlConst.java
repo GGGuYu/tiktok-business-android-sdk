@@ -15,6 +15,10 @@ public class UrlConst {
         return HTTPS + "analytics.us.tiktok.com" + PATH_CONFIG2;
     }
 
+    public static String getDebugModeUrl() {
+        return HTTPS + "analytics.us.tiktok.com" + PATH_CONFIG;
+    }
+
     public static String getDDLUrl() {
         return HTTPS + TikTokBusinessSdk.getApiTrackDomain() + PATH_DDL;
     }

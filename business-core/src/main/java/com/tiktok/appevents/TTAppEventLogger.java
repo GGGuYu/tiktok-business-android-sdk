@@ -540,6 +540,7 @@ public class TTAppEventLogger {
      */
     public void fetchGlobalConfig(int delaySeconds) {
         addToLater(() -> {
+            boolean enableSDK = false;
             try {
                 logger.info("Fetching global config....");
 
@@ -557,10 +558,9 @@ public class TTAppEventLogger {
                 }
 
                 JSONObject businessSdkConfig = JSON.getJsonObject(requestResult, "business_sdk_config");
-                boolean enableSDK = JSON.getBoolean(businessSdkConfig, "enable_sdk", false);
+                enableSDK = JSON.getBoolean(businessSdkConfig, "enable_sdk", false);
                 String availableVersion = JSON.getString(businessSdkConfig, "available_version");
                 String trackEventDomain = JSON.getString(businessSdkConfig, "domain");
-                boolean enableDebugMode = JSON.getBoolean(businessSdkConfig, "enable_debug_mode", false);
 
                 NetworkTimeout.updateConfig(businessSdkConfig);
 
@@ -571,11 +571,7 @@ public class TTAppEventLogger {
                     logger.info("Clear all events and stop timers because global switch is not turned on");
                     clearAllImmediately();
                 }
-                if (enableDebugMode) {
-                    TikTokBusinessSdk.enableDebugMode();
-                } else {
-                    TikTokBusinessSdk.disableDebugMode();
-                }
+
                 TikTokBusinessSdk.setApiAvailableVersion(availableVersion);
                 TikTokBusinessSdk.setApiTrackDomain(trackEventDomain);
                 logger.debug("available_version=" + availableVersion);
@@ -590,6 +586,10 @@ public class TTAppEventLogger {
                 if (TikTokBusinessSdk.isSystemActivated() && !TikTokBusinessSdk.isActivatedLogicRun) {
                     TikTokBusinessSdk.isActivatedLogicRun = true;
                     activateSdk();
+                }
+
+                if (enableSDK && !DebugModeHelper.isSuccess()) {
+                    addToQ(DebugModeHelper::tryRequestConfig);
                 }
             }
         }, delaySeconds);

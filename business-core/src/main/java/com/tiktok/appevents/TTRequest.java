@@ -137,6 +137,27 @@ class TTRequest {
         return config;
     }
 
+    public static JSONObject getDebugModeConfig() {
+        try {
+            JSONObject jsonObject = buildConfigParams();
+            String url = UrlConst.getDebugModeUrl();
+            String data = HttpRequestUtil.doPost(url, getHeadParamMap, jsonObject.toString(), false);
+            if (!TextUtils.isEmpty(data)) {
+                try {
+                    JSONObject resultJson = JSON.build(data);
+                    int code = JSON.getInt(resultJson, "code", -1);
+                    if (code == 0) {
+                        return JSON.getJsonObject(resultJson, "data");
+                    }
+                } catch (Throwable ignore) {
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+
+        return null;
+    }
+
     public static JSONObject buildConfigParams() {
         JSONObject jsonObject = JSON.build();
         try {
