@@ -15,6 +15,7 @@ public class TTPurchaseInfo {
     private final JSONObject skuDetails;
     private String eventId;
     private boolean isAutoTrack;
+    private boolean isSubs = false;
 
     public static class InvalidTTPurchaseInfoException extends Exception {
 
@@ -105,5 +106,13 @@ public class TTPurchaseInfo {
 
     public void setAutoTrack(boolean autoTrack) {
         isAutoTrack = autoTrack;
+    }
+
+    public boolean isSubs() {
+        return isSubs;
+    }
+
+    public void setSubs(boolean subs) {
+        isSubs = subs;
     }
 }

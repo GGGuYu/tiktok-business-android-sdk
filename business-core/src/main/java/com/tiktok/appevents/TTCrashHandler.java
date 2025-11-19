@@ -9,11 +9,13 @@ package com.tiktok.appevents;
 import static com.tiktok.util.TTConst.TTSDK_PREFIX;
 
 import android.content.Context;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.HttpRequestUtil;
+import com.tiktok.util.IOUtils;
 import com.tiktok.util.JSON;
 import com.tiktok.util.TTLogger;
 import com.tiktok.util.TTUtil;
@@ -26,8 +28,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * A global crash handler which mainly does
@@ -43,74 +45,98 @@ public class TTCrashHandler {
     private static final int MONITOR_RETRY_LIMIT = 2;
     private static final int MONITOR_BATCH_MAX = 5;
 
-    static TTCrashReport crashReport = new TTCrashReport();
+    static volatile TTCrashReport crashReport = new TTCrashReport();
 
     public static void handleCrash(String originTag, Throwable ex, int type) {
-        ttLogger.error(ex, "Error caused by sdk at " + originTag +
-                "\n" + ex.getMessage() + "\n" + getStackTrace(ex));
-        persistException(ex, type);
+        if (ex != null) {
+            if (TextUtils.isEmpty(originTag)) {
+                originTag = "";
+            }
+            ttLogger.error(ex, "Error caused by sdk at " + originTag + "\n" + ex.getMessage());
+            persistException(ex, type);
+        }
     }
 
     public static void retryLater(JSONObject monitor) {
-        crashReport.addReport(monitor.toString(), System.currentTimeMillis(), 0);
+        try {
+            if (crashReport != null) {
+                crashReport.addReport(monitor.toString(), System.currentTimeMillis(), 0);
+                if (crashReport.reports.size() >= MONITOR_BATCH_MAX) {
+                    reportMonitor(crashReport);
+                }
+            }
+        } catch (Throwable ignore) {
+        }
     }
 
     public static void persistToFile() {
-        for (TTCrashReport.Monitor m : crashReport.reports) {
-            ttLogger.info("persistToFile %s", m.monitor);
+        try {
+            if (crashReport != null && !crashReport.reports.isEmpty()) {
+                saveToFile(crashReport);
+                crashReport = new TTCrashReport();
+            }
+        } catch (Throwable ignore) {
         }
-        saveToFile(crashReport);
-        crashReport = new TTCrashReport();
     }
 
     public static void initCrashReporter() {
         // read any from file if exists
-        TTCrashReport fileReport = readFromFile();
-        if (fileReport != null) {
-            crashReport.reports.addAll(fileReport.reports);
+        try {
+            TTCrashReport fileReport = readFromFile();
+            if (fileReport != null && fileReport.reports != null) {
+                crashReport.reports.addAll(fileReport.reports);
+            }
+
             try {
                 Context context = TikTokBusinessSdk.getApplicationContext();
                 File f = new File(context.getFilesDir(), CRASH_REPORT_FILE);
                 if (f.exists()) f.delete();
-            } catch (Exception ignored) {
+            } catch (Throwable ignored) {
             }
+
+            TTCrashReport failed = reportMonitor(crashReport);
+            saveToFile(failed);
+            crashReport = new TTCrashReport();
+        } catch (Throwable ignore) {
         }
-        crashReport = reportMonitor(crashReport);
-        saveToFile(crashReport);
-        crashReport = new TTCrashReport();
     }
 
     private static TTCrashReport reportMonitor(@NonNull TTCrashReport cr) {
         if (cr.reports == null || cr.reports.isEmpty()) return cr;
 
-        TTCrashReport ttCrashReport = new TTCrashReport();
+        TTCrashReport failedReport = new TTCrashReport();
         // batch send monitor events
         for (int i = 0; i < cr.reports.size(); i += MONITOR_BATCH_MAX) {
-            int j = i + MONITOR_BATCH_MAX;
-            if (j > cr.reports.size()) j = cr.reports.size();
-            List<TTCrashReport.Monitor> batch = cr.reports.subList(i, j);
-            JSONArray batchReq = JSON.buildArr();
-            for (TTCrashReport.Monitor m : batch) {
-                try {
-                    JSONObject js = JSON.build(m.monitor);
-                    if (js != null && js.length() > 0) {
-                        JSON.putArr(batchReq, js);
+            try {
+                int j = i + MONITOR_BATCH_MAX;
+                if (j > cr.reports.size()) j = cr.reports.size();
+                List<TTCrashReport.Monitor> batch = cr.reports.subList(i, j);
+                JSONArray batchReq = JSON.buildArr();
+                for (TTCrashReport.Monitor m : batch) {
+                    try {
+                        JSONObject js = JSON.build(m.monitor);
+                        if (js != null && js.length() > 0) {
+                            JSON.putArr(batchReq, js);
+                        }
+                    } catch (Throwable ignored) {
                     }
-                } catch (Throwable ignored) {
                 }
-            }
 
-            JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
-            JSON.putObject(req, "batch", batchReq);
+                if (batchReq.length() > 0) {
+                    JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
+                    JSON.putObject(req, "batch", batchReq);
 
-            String resp = TTRequest.reportMonitorEvent(req);
-            if (HttpRequestUtil.getCodeFromApi(resp) != 0) {
-                for (TTCrashReport.Monitor o : batch) {
-                    ttCrashReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt + 1);
+                    String resp = TTRequest.reportMonitorEvent(req);
+                    if (HttpRequestUtil.getCodeFromApi(resp) != 0) {
+                        for (TTCrashReport.Monitor o : batch) {
+                            failedReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt + 1);
+                        }
+                    }
                 }
+            } catch (Throwable ignore) {
             }
         }
-        return ttCrashReport;
+        return failedReport;
     }
 
     static class TTCrashReport implements Serializable {
@@ -126,7 +152,7 @@ public class TTCrashHandler {
             }
         }
 
-        List<Monitor> reports = new ArrayList<>();
+        List<Monitor> reports = new CopyOnWriteArrayList<>();
 
         public void addReport(String o, long t, int a) {
             if (a < MONITOR_RETRY_LIMIT)
@@ -143,12 +169,12 @@ public class TTCrashHandler {
             crashReport.addReport(stat.toString(), System.currentTimeMillis(), 0);
             saveToFile(crashReport);
             crashReport = new TTCrashReport();
-        } catch (Throwable e) {
+        } catch (Throwable ignore) {
             // exception during saving exception to file, post direct
-            if (stat != null) {
+            if (stat != null && stat.has("monitor")) {
                 JSONArray batchReq = JSON.buildArr();
                 JSON.putArr(batchReq, stat);
-                
+
                 JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
                 JSON.putObject(req, "batch", batchReq);
 
@@ -158,37 +184,40 @@ public class TTCrashHandler {
     }
 
     private static void saveToFile(TTCrashReport cr) {
+        if (cr == null || cr.reports == null || cr.reports.isEmpty()) {
+            return;
+        }
+
+        FileOutputStream fos = null;
+        ObjectOutputStream os = null;
         try {
             Context context = TikTokBusinessSdk.getApplicationContext();
-            FileOutputStream fos = context.openFileOutput(CRASH_REPORT_FILE, Context.MODE_PRIVATE);
-            ObjectOutputStream os = new ObjectOutputStream(fos);
+            fos = context.openFileOutput(CRASH_REPORT_FILE, Context.MODE_PRIVATE);
+            os = new ObjectOutputStream(fos);
             os.writeObject(cr);
-            os.close();
-            fos.close();
         } catch (Throwable e) {
             // save failed, report instant if possible
             reportMonitor(cr);
+        } finally {
+            IOUtils.close(fos, os);
         }
     }
 
     private static TTCrashReport readFromFile() {
-        TTCrashReport meta = new TTCrashReport();
         Context context = TikTokBusinessSdk.getApplicationContext();
-        try {
-            FileInputStream fis = context.openFileInput(CRASH_REPORT_FILE);
-            meta = TTSafeReadObjectUtil.safeReadTTCrashHandler(fis);
-            fis.close();
-        } catch (Exception ignored) {
+        if (context == null) {
+            return null;
         }
-        return meta;
-    }
 
-    private static String getStackTrace(Throwable t) {
-        StringBuilder buffer = new StringBuilder();
-        for (StackTraceElement curr : t.getStackTrace()) {
-            buffer.append(curr.toString()).append("\n");
+        FileInputStream fis = null;
+        try {
+            fis = context.openFileInput(CRASH_REPORT_FILE);
+            return TTSafeReadObjectUtil.safeReadTTCrashHandler(fis);
+        } catch (Throwable ignored) {
+        } finally {
+            IOUtils.close(fis);
         }
-        return buffer.toString();
+        return null;
     }
 
     public static boolean isTTSDKRelatedException(Throwable e) {
@@ -205,9 +234,9 @@ public class TTCrashHandler {
     }
 
     public static boolean isTTSDKRelatedException(StackTraceElement[] elts) {
-        if (elts == null) return false;
+        if (elts == null || elts.length < 1) return false;
         for (StackTraceElement element : elts) {
-            if (element.getClassName().startsWith(TTSDK_PREFIX)) {
+            if (element != null && element.getClassName().startsWith(TTSDK_PREFIX)) {
                 return true;
             }
         }

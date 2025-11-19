@@ -97,7 +97,7 @@ public class TTUtil {
             JSON.putObject(monitor, "name", "exception");
             JSON.putObject(monitor, "meta", getMetaException(ex, ts, type));
             JSON.putObject(monitor, "extra", null);
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
         }
         return monitor;
     }
@@ -127,7 +127,7 @@ public class TTUtil {
             } else {
                 JSON.putBoolean(meta, "success", true);
             }
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
         }
         return meta;
     }

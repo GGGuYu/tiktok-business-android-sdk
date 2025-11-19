@@ -123,6 +123,7 @@ class V5_V8BillingProxy implements IBillingProxy {
                                         TTPurchaseInfo purchaseInfo = new TTPurchaseInfo(JSON.build(purchase.getOriginalJson()),
                                                 JSON.build(skuDetails.getOriginalJson()));
                                         purchaseInfo.setAutoTrack(true);
+                                        purchaseInfo.setSubs(!isInAppPurchase);
                                         purchaseInfos.add(purchaseInfo);
                                     } catch (Throwable ignore) {
                                     }
@@ -327,13 +328,14 @@ class V5_V8BillingProxy implements IBillingProxy {
                     if (sku != null && sku.length() > 0) {
                         TTPurchaseInfo info = new TTPurchaseInfo(payData.data, sku);
                         info.setAutoTrack(true);
+                        info.setSubs(isSubs);
                         list.add(info);
                     }
                 } catch (Throwable ignore) {
                 }
             }
             if (!list.isEmpty()) {
-                TikTokBusinessSdk.trackGooglePlayPurchase(list);
+                TikTokBusinessSdk.getAppEventLogger().trackPurchase(true, list);
             }
         } catch (Throwable ignore) {
         }

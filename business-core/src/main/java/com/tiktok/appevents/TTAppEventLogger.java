@@ -186,6 +186,10 @@ public class TTAppEventLogger {
     }
 
     public void trackPurchase(List<TTPurchaseInfo> purchaseInfos) {
+        trackPurchase(false, purchaseInfos);
+    }
+
+    public void trackPurchase(boolean isHistory, List<TTPurchaseInfo> purchaseInfos) {
         if (!TikTokBusinessSdk.isSystemActivated()) {
             logger.info("Global switch is off, ignore track purchase");
             return;
@@ -198,7 +202,7 @@ public class TTAppEventLogger {
             for (TTPurchaseInfo purchaseInfo : purchaseInfos) {
                 JSONObject property = TTInAppPurchaseManager.getPurchaseProps(purchaseInfo);
                 if (property != null) {
-                    track("Purchase", property, purchaseInfo.getEventId());
+                    track(isHistory ? "__purchase_history" : "Purchase", property, purchaseInfo.getEventId());
                 }
             }
         });
@@ -596,6 +600,7 @@ public class TTAppEventLogger {
                               @Nullable JSONObject extra) {
         if (!metricsEnabled) return;
         addToQ(() -> {
+            if (!metricsEnabled) return;
             JSONObject stat;
             try {
                 stat = TTRequestBuilder.getHealthMonitorBase();
