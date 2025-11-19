@@ -100,7 +100,6 @@ public class TTEDPEventTrack {
             JSONObject eventProp = JSON.build();
             JSON.putObject(eventProp, "meta", property);
             TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_PAGE_SHOW, eventProp, null);
-            pageShowIsSending = false;
         } catch (Throwable ignore) {
         }
     }
@@ -124,7 +123,6 @@ public class TTEDPEventTrack {
             JSONObject eventProp = JSON.build();
             JSON.putObject(eventProp, "meta", property);
             TikTokBusinessSdk.getAppEventLogger().trackEdp(EDP_EVENT_NAME_CLICK, eventProp, null);
-            isSending = false;
         } catch (Throwable ignore) {
         }
     }
