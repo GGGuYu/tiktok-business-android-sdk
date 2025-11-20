@@ -8,8 +8,10 @@ package com.tiktok.util;
 
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_NET_ERROR;
 
+import android.os.SystemClock;
 import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tiktok.TikTokBusinessSdk;
@@ -38,6 +40,7 @@ public class HttpRequestUtil {
 
 
     public static class HttpRequestOptions {
+        private boolean isGzip = true;
         private static final int UNSET = -1;
         public int connectTimeout = UNSET;
         public int readTimeout = UNSET;
@@ -78,7 +81,10 @@ public class HttpRequestUtil {
                     }
                 }
             }
-            connection.setRequestProperty("Content-Encoding", "gzip");
+
+            if (options.isGzip) {
+                connection.setRequestProperty("Content-Encoding", "gzip");
+            }
 
             connection.connect();
         } catch (Throwable e) {
@@ -209,8 +215,27 @@ public class HttpRequestUtil {
             } else {
                 headerParamMap.remove("X-TT-Signature");
             }
-            byte[] writeBytes = compress2Gzip(jsonStr);
-            String contentLength = String.valueOf(writeBytes.length);
+
+            GzipInfo info = compress2Gzip(jsonStr);
+            String contentLength = "0";
+            byte[] writeBytes = info.bytes;
+            if (writeBytes != null && writeBytes.length > 0) {
+                contentLength = String.valueOf(writeBytes.length);
+            } else {
+                if (options != null) {
+                    options.isGzip = false;
+                }
+                try {
+                    writeBytes = jsonStr.getBytes("utf-8");
+                    contentLength = String.valueOf(writeBytes.length);
+                } catch (Throwable ignore) {
+                }
+            }
+
+            if (writeBytes == null || writeBytes.length == 0) {
+                monitorGzipData(info);
+                writeBytes = new byte[]{};
+            }
 
             connection = connect(url, headerParamMap, options, "POST", contentLength);
             if (connection == null) return null;
@@ -276,9 +301,44 @@ public class HttpRequestUtil {
         return result;
     }
 
-    private static byte[] compress2Gzip(String requestBody) {
+    private static void monitorGzipData(GzipInfo info) {
+        if (info == null) {
+            return;
+        }
+
+        try {
+            JSONObject meta = TTUtil.getMetaWithTS(null);
+            JSON.putInt(meta, "code", -1);
+            JSON.putLong(meta, "duration", info.duration);
+            String msg = "";
+            if (info.throwable1 != null) {
+                msg += info.throwable1.getMessage();
+            }
+            if (info.throwable2 != null) {
+                msg += "==" + info.throwable2.getMessage();
+            }
+            JSON.putObject(meta, "err_msg", msg);
+            TikTokBusinessSdk.getAppEventLogger().monitorMetric("gzip_err", meta, null);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static class GzipInfo {
+        public long duration;
+        public byte[] bytes;
+        public Throwable throwable1;
+        public Throwable throwable2;
+    }
+
+    @NonNull
+    private static GzipInfo compress2Gzip(String requestBody) {
+        long start = SystemClock.elapsedRealtime();
+        GzipInfo info = new GzipInfo();
+
         if (TextUtils.isEmpty(requestBody)) {
-            return null;
+            info.duration = SystemClock.elapsedRealtime() - start;
+            info.throwable1 = new Exception("request body is empty");
+            return info;
         }
         ByteArrayOutputStream outputStream = null;
         GZIPOutputStream gzipOutputStream = null;
@@ -288,26 +348,23 @@ public class HttpRequestUtil {
             gzipOutputStream = new GZIPOutputStream(outputStream);
             gzipOutputStream.write(requestBody.getBytes("utf-8"));
         } catch (Throwable e) {
-            ttLogger.error(e, e.toString());
+            info.throwable1 = e;
         } finally {
-            if (gzipOutputStream != null) {
-                try {
-                    gzipOutputStream.close();
-                } catch (Throwable ignore) {
-                }
-            }
+            IOUtils.close(gzipOutputStream);
             if (outputStream != null) {
                 try {
                     bytes = outputStream.toByteArray();
-                } catch (Throwable ignore) {
+                    info.bytes = bytes;
+                } catch (Throwable e) {
+                    info.throwable2 = e;
                 }
-                try {
-                    outputStream.close();
-                } catch (Throwable ignore) {
-                }
+                IOUtils.close(outputStream);
             }
         }
-        return bytes;
+
+        info.duration = SystemClock.elapsedRealtime() - start;
+
+        return info;
     }
 
     private static String streamToString(InputStream is) {
