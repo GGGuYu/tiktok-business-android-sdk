@@ -993,10 +993,11 @@ public class TikTokBusinessSdk {
             }
             if (appEventLogger == null || !TikTokBusinessSdk.isSystemActivated()) {
                 callback.completion(null, new ErrorData(TT_DDL_CODE_NOT_INIT, TT_DDL_MSG_NOT_INIT));
+                return;
             }
-            appEventLogger.fetchDeferredDeeplinkWithCompletion(callback);
-        } catch (Throwable e) {
 
+            appEventLogger.fetchDeferredDeeplinkWithCompletion(callback);
+        } catch (Throwable ignore) {
         }
     }
 

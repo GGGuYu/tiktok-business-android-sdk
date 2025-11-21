@@ -7,7 +7,6 @@
 package com.tiktok.appevents;
 
 import static com.tiktok.appevents.ErrorData.TT_DDL_CODE_HTTP_ERROR;
-import static com.tiktok.appevents.ErrorData.TT_DDL_MSG_HTTP_ERROR;
 import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.EDP_NATIVE_SDK_CONFIG;
 import static com.tiktok.appevents.edp.TTEDPEventTrack.trackFirstAppLaunch;
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
@@ -626,23 +625,31 @@ public class TTAppEventLogger {
     }
 
     public void fetchDeferredDeeplinkWithCompletion(TikTokBusinessSdk.FetchDeferredDeeplinkCompletion callback) {
+        final DeeplinkCallbackWrapper wrapper = new DeeplinkCallbackWrapper(callback);
+        wrapper.markInit();
+
         addToQ(() -> {
+            wrapper.markThread();
+
+            String ddlData = "";
+            ErrorData errorData = null;
+
             try {
                 HttpRequestUtil.HttpResponse response = TTRequest.fetchDeferredDeeplinkWithCompletion();
-                String ddlData = JSON.getString(JSON.getJsonObject(response.body, "data"), "ddl");
-                if (response.isOK() && !TextUtils.isEmpty(ddlData)) {
-                    callback.completion(ddlData, null);
-                } else {
-                    String msg = JSON.getString(response.body, "message");
-                    if (TextUtils.isEmpty(msg) && response.throwable != null) {
-                        msg = response.throwable.getMessage();
-                    }
-                    int code = response.getErrCode();
-                    callback.completion("", new ErrorData(code, msg == null ? "" : msg));
+                ddlData = JSON.getString(JSON.getJsonObject(response.body, "data"), "ddl");
+                wrapper.markRequest();
+
+                if (!response.isOK() || TextUtils.isEmpty(ddlData)) {
+                    ddlData = "";
+                    errorData = new ErrorData(response.getErrCode(), response.getErrMsg());
                 }
-            } catch (Throwable throwable) {
-                callback.completion("", new ErrorData(TT_DDL_CODE_HTTP_ERROR, TT_DDL_MSG_HTTP_ERROR));
+            } catch (Throwable e) {
+                ddlData = "";
+                errorData = new ErrorData(TT_DDL_CODE_HTTP_ERROR, e.getMessage());
             }
+
+            wrapper.markEnd();
+            wrapper.completion(ddlData, errorData);
         });
     }
 
