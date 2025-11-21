@@ -3,6 +3,7 @@ package com.tiktok.util;
 import android.os.Parcel;
 
 import java.io.Closeable;
+import java.net.HttpURLConnection;
 
 public final class IOUtils {
 
@@ -26,6 +27,20 @@ public final class IOUtils {
                 for (Parcel parcel : parcels) {
                     try {
                         parcel.recycle();
+                    } catch (Throwable ignore) {
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    public static void close(HttpURLConnection... conns) {
+        try {
+            if (conns != null) {
+                for (HttpURLConnection conn : conns) {
+                    try {
+                        conn.disconnect();
                     } catch (Throwable ignore) {
                     }
                 }

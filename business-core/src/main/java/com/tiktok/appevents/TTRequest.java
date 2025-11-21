@@ -28,14 +28,15 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 class TTRequest {
-    private static final String TAG = TTRequest.class.getCanonicalName();
+    private static final String TAG = "TTRequest";
     private static final TTLogger logger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
 
     private static final int MAX_EVENT_SIZE = 50;
@@ -47,10 +48,10 @@ class TTRequest {
 
     // stats for the whole lifecycle
     private static final TreeSet<Long> allRequestIds = new TreeSet<>();
-    private static final List<TTAppEvent> successfullySentRequests = new ArrayList<>();
+    private static final List<TTAppEvent> successfullySentRequests = new CopyOnWriteArrayList<>();
 
-    private static final Map<String, String> headParamMap = new HashMap<>();
-    private static final Map<String, String> getHeadParamMap = new HashMap<>();
+    private static final Map<String, String> headParamMap = new ConcurrentHashMap<>();
+    private static final Map<String, String> getHeadParamMap = new ConcurrentHashMap<>();
 
     static {
         // these fields wont change, so cache it locally to enhance performance
@@ -68,28 +69,15 @@ class TTRequest {
     }
 
     public static JSONObject getBusinessSDKConfig() {
-        long initTimeMS = System.currentTimeMillis();
-//        TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api_start", TTUtil.getMetaWithTS(initTimeMS), null);
-        logger.info("Try to fetch global configs");
-        JSONObject jsonObject = buildConfigParams();
-
-        String url = UrlConst.getConfigUrl();
-
-        logger.debug(url);
         if (TextUtils.isEmpty(TikTokBusinessSdk.getTTAppId()) || TextUtils.isEmpty(TikTokBusinessSdk.getAppId())) {
-            try {
-                long endTimeMS = System.currentTimeMillis();
-                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
-                JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
-                JSON.putBoolean(meta, "success", false);
-                JSON.putObject(meta, "log_id", "");
-                TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api", meta, null);
-            } catch (Throwable ignored) {
-            }
             JSONObject result = JSON.build();
             JSON.putBoolean(result, "enable_sdk", false);
+            logger.debug("config request return by appid or ttAppId");
             return result;
         }
+
+        JSONObject paramsJson = buildConfigParams();
+        String url = UrlConst.getConfigUrl();
 
         //handle cache query
         try {
@@ -108,53 +96,30 @@ class TTRequest {
         } catch (Throwable ignore) {
         }
 
-        String result = HttpRequestUtil.doPost(url, getHeadParamMap, jsonObject.toString(), false);
-        logger.debug(result);
-        JSONObject config = null;
+        HttpRequestUtil.HttpResponse result = HttpRequestUtil.doPost(url, getHeadParamMap, paramsJson.toString(), false);
         if (result != null) {
-            try {
-                JSONObject resultJson = JSON.build(result);
-                int code = JSON.getInt(resultJson, "code", -1);
-                if (code == 0) {
-                    config = JSON.getJsonObject(resultJson, "data");
-                }
-                logger.info("Global config fetched: " + config);
-            } catch (Throwable e) {
-                // might be api returning something wrong
-                TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
-            }
+            logger.debug(result.url);
+            logger.debug("code=" + String.valueOf(result.code));
+            logger.debug("rsp=" + String.valueOf(result.body));
         }
-        try {
-            long endTimeMS = System.currentTimeMillis();
-            JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
-            JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
-            JSON.putBoolean(meta, "success", config != null);
-            JSON.putObject(meta, "log_id", HttpRequestUtil.getLogIDFromApi(result));
-            TikTokBusinessSdk.getAppEventLogger().monitorMetric("config_api", meta, null);
-        } catch (Throwable ignored) {
+        if (result != null && result.isOK()) {
+            return JSON.getJsonObject(result.body, "data");
         }
+
         // might be api returning something wrong
-        return config;
+        return null;
     }
 
     public static JSONObject getDebugModeConfig() {
         try {
-            JSONObject jsonObject = buildConfigParams();
+            JSONObject paramsJson = buildConfigParams();
             String url = UrlConst.getDebugModeUrl();
-            String data = HttpRequestUtil.doPost(url, getHeadParamMap, jsonObject.toString(), false);
-            if (!TextUtils.isEmpty(data)) {
-                try {
-                    JSONObject resultJson = JSON.build(data);
-                    int code = JSON.getInt(resultJson, "code", -1);
-                    if (code == 0) {
-                        return JSON.getJsonObject(resultJson, "data");
-                    }
-                } catch (Throwable ignore) {
-                }
+            HttpRequestUtil.HttpResponse response = HttpRequestUtil.doPost(url, getHeadParamMap, paramsJson.toString(), false);
+            if (response != null && response.isOK()) {
+                return JSON.getJsonObject(response.body, "data");
             }
         } catch (Throwable ignore) {
         }
-
         return null;
     }
 
@@ -258,22 +223,23 @@ class TTRequest {
                 TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
                 continue;
             }
-            String result = HttpRequestUtil.doPost(url, headParamMap, basePayload.toString());
+            HttpRequestUtil.HttpResponse result = HttpRequestUtil.doPost(url, headParamMap, basePayload.toString());
             if (isEdp) {
                 return null;
             }
-            if (result == null) {
+
+
+            if (result == null || !result.isOK()) {
                 failedEventsToBeSaved.addAll(currentBatch);
                 failedRequests += currentBatch.size();
             } else {
                 try {
-                    JSONObject resultJson = JSON.build(result);
-                    int code = JSON.getInt(resultJson, "code");
+                    logger.debug("url=" + String.valueOf(url));
+                    logger.debug("rsp=" + String.valueOf(result.body));
 
+                    int code = result.code;
                     if (TikTokBusinessSdk.isInSdkDebugMode() || code == TTConst.ApiErrorCodes.API_ERROR.code || code == TTConst.ApiErrorCodes.PARTIAL_SUCCESS.code) {
-                        if (currentBatch != null) {
-                            failedEventsToBeDiscardedSize += currentBatch.size();
-                        }
+                        failedEventsToBeDiscardedSize += currentBatch.size();
                         failedRequests += currentBatch.size();
                     } else if (code != 0) {
                         failedEventsToBeSaved.addAll(currentBatch);
@@ -287,7 +253,6 @@ class TTRequest {
                     failedEventsToBeSaved.addAll(currentBatch);
                     TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
                 }
-                logger.debug(result);
             }
 
             notifyChange();
@@ -295,8 +260,8 @@ class TTRequest {
         logger.debug("Flushed %d events successfully", successfulRequests);
 
         // might be due to network disconnection
-        if (failedEventsToBeSaved.size() != 0) {
-            logger.debug("Failed to flush %d events, will save them to disk", failedEventsToBeSaved.size());
+        if (!failedEventsToBeSaved.isEmpty()) {
+            logger.debug("Failed to flush %d events, will save them to disk");
         }
         // api returns some unrecoverable error
         int discardedEventCount = failedEventsToBeDiscardedSize;
@@ -396,12 +361,12 @@ class TTRequest {
         return result;
     }
 
-    public static String reportMonitorEvent(JSONObject stat) {
+    public static HttpRequestUtil.HttpResponse reportMonitorEvent(JSONObject stat) {
         String url = UrlConst.getMonitorUrl();
         return HttpRequestUtil.doPost(url, headParamMap, stat.toString());
     }
 
-    public static String fetchDeferredDeeplinkWithCompletion() {
+    public static HttpRequestUtil.HttpResponse fetchDeferredDeeplinkWithCompletion() {
         JSONObject stat = TTRequestBuilder.ddlJson();
         String url = UrlConst.getDDLUrl();
         return HttpRequestUtil.doPost(url, headParamMap, stat.toString(), false);

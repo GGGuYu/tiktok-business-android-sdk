@@ -37,7 +37,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 2. Prevent from app from crash
  */
 public class TTCrashHandler {
-    private static final String TAG = TTCrashHandler.class.getCanonicalName();
+    private static final String TAG = "TTCrashHandler";
     private static final TTLogger ttLogger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
 
     private static final String CRASH_REPORT_FILE = "tt_crash_log";
@@ -126,8 +126,8 @@ public class TTCrashHandler {
                     JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
                     JSON.putObject(req, "batch", batchReq);
 
-                    String resp = TTRequest.reportMonitorEvent(req);
-                    if (HttpRequestUtil.getCodeFromApi(resp) != 0) {
+                    HttpRequestUtil.HttpResponse resp = TTRequest.reportMonitorEvent(req);
+                    if (resp == null || !resp.isOK()) {
                         for (TTCrashReport.Monitor o : batch) {
                             failedReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt + 1);
                         }

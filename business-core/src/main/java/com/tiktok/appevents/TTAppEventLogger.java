@@ -26,6 +26,7 @@ import com.tiktok.appevents.edp.EDPConfig;
 import com.tiktok.appevents.edp.TTEDPEventTrack;
 import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.unity.TTUnityBridge;
+import com.tiktok.util.HttpRequestUtil;
 import com.tiktok.util.JSON;
 import com.tiktok.util.NetworkTimeout;
 import com.tiktok.util.SystemInfoUtil;
@@ -627,13 +628,17 @@ public class TTAppEventLogger {
     public void fetchDeferredDeeplinkWithCompletion(TikTokBusinessSdk.FetchDeferredDeeplinkCompletion callback) {
         addToQ(() -> {
             try {
-                JSONObject ddlInfo = JSON.build(TTRequest.fetchDeferredDeeplinkWithCompletion());
-                int code = JSON.getInt(ddlInfo, "code");
-                String data = JSON.getString(JSON.getJsonObject(ddlInfo, "data"), "ddl");
-                if (code == 0 && !TextUtils.isEmpty(data)) {
-                    callback.completion(data, null);
+                HttpRequestUtil.HttpResponse response = TTRequest.fetchDeferredDeeplinkWithCompletion();
+                String ddlData = JSON.getString(JSON.getJsonObject(response.body, "data"), "ddl");
+                if (response.isOK() && !TextUtils.isEmpty(ddlData)) {
+                    callback.completion(ddlData, null);
                 } else {
-                    callback.completion("", new ErrorData(code, JSON.getString(ddlInfo, "message", "")));
+                    String msg = JSON.getString(response.body, "message");
+                    if (TextUtils.isEmpty(msg) && response.throwable != null) {
+                        msg = response.throwable.getMessage();
+                    }
+                    int code = response.getErrCode();
+                    callback.completion("", new ErrorData(code, msg == null ? "" : msg));
                 }
             } catch (Throwable throwable) {
                 callback.completion("", new ErrorData(TT_DDL_CODE_HTTP_ERROR, TT_DDL_MSG_HTTP_ERROR));
