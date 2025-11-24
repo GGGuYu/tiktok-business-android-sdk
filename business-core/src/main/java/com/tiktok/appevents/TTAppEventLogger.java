@@ -440,7 +440,7 @@ public class TTAppEventLogger {
                 TTRequest
                         .reportAppEvent(TTRequestBuilder.getBasePayloadWithTs(), TTEdpAppEventsQueue.exportAllEvents(), true);
 
-                if (!failedEvents.isEmpty()) { // flush failed, persist events
+                if (failedEvents != null && !failedEvents.isEmpty()) { // flush failed, persist events
                     logger.debug("Failed to send %d events, will save to disk", failedEvents.size());
                     TTAppEventStorage.persist(failedEvents);
                 }
