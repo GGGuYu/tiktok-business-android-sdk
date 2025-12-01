@@ -281,7 +281,7 @@ public class HttpRequestUtil {
 
         try {
             //monitor ignore
-            if (TextUtils.isEmpty(response.url) || !response.url.contains(UrlConst.PATH_MONITOR)) {
+            if (TextUtils.isEmpty(response.url) || response.url.contains(UrlConst.PATH_MONITOR)) {
                 return;
             }
 
