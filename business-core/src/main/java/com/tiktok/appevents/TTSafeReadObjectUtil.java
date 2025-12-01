@@ -5,6 +5,8 @@
  ******************************************************************************/
 package com.tiktok.appevents;
 
+import com.tiktok.util.IOUtils;
+
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,7 +20,6 @@ public class TTSafeReadObjectUtil {
     /**
      * Safely read the object and do some security checks
      */
-
     public static TTAppEventPersist safeReadTTAppEventPersist(InputStream in) throws IOException, ClassNotFoundException {
         List<Class<?>> safeClasses = new ArrayList<>();
         safeClasses.add(TTAppEventPersist.class);
@@ -91,13 +92,7 @@ public class TTSafeReadObjectUtil {
             }
         };
         T t = (T) ois.readObject();
-        try{
-            in.close();
-            lis.close();
-            ois.close();
-        }catch (Throwable throwable){
-            throwable.printStackTrace();
-        }
+        IOUtils.close(in, lis, ois);
         return t;
     }
 }

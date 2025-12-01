@@ -28,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -61,9 +62,6 @@ public class TTCrashHandler {
         try {
             if (crashReport != null) {
                 crashReport.addReport(monitor.toString(), System.currentTimeMillis(), 0);
-                if (crashReport.reports.size() >= MONITOR_BATCH_MAX) {
-                    reportMonitor(crashReport);
-                }
             }
         } catch (Throwable ignore) {
         }
@@ -105,36 +103,45 @@ public class TTCrashHandler {
         if (cr.reports == null || cr.reports.isEmpty()) return cr;
 
         TTCrashReport failedReport = new TTCrashReport();
-        // batch send monitor events
-        for (int i = 0; i < cr.reports.size(); i += MONITOR_BATCH_MAX) {
-            try {
-                int j = i + MONITOR_BATCH_MAX;
-                if (j > cr.reports.size()) j = cr.reports.size();
-                List<TTCrashReport.Monitor> batch = cr.reports.subList(i, j);
-                JSONArray batchReq = JSON.buildArr();
-                for (TTCrashReport.Monitor m : batch) {
-                    try {
-                        JSONObject js = JSON.build(m.monitor);
-                        if (js != null && js.length() > 0) {
-                            JSON.putArr(batchReq, js);
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-
-                if (batchReq.length() > 0) {
-                    JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
-                    JSON.putObject(req, "batch", batchReq);
-
-                    HttpRequestUtil.HttpResponse resp = TTRequest.reportMonitorEvent(req);
-                    if (resp == null || !resp.isOK()) {
-                        for (TTCrashReport.Monitor o : batch) {
-                            failedReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt + 1);
+        try {
+            List<String> duplicate = new ArrayList<>();
+            // batch send monitor events
+            for (int i = 0; i < cr.reports.size(); i += MONITOR_BATCH_MAX) {
+                try {
+                    int j = i + MONITOR_BATCH_MAX;
+                    if (j > cr.reports.size()) j = cr.reports.size();
+                    List<TTCrashReport.Monitor> batch = cr.reports.subList(i, j);
+                    JSONArray batchReq = JSON.buildArr();
+                    for (TTCrashReport.Monitor m : batch) {
+                        try {
+                            String data = m.monitor;
+                            if (TextUtils.isEmpty(data) || duplicate.contains(data)) {
+                                continue;
+                            }
+                            duplicate.add(data);
+                            JSONObject js = JSON.build(data);
+                            if (js != null && js.length() > 0) {
+                                JSON.putArr(batchReq, js);
+                            }
+                        } catch (Throwable ignored) {
                         }
                     }
+
+                    if (batchReq.length() > 0) {
+                        JSONObject req = TTRequestBuilder.getBasePayloadWithTs();
+                        JSON.putObject(req, "batch", batchReq);
+
+                        HttpRequestUtil.HttpResponse resp = TTRequest.reportMonitorEvent(req);
+                        if (resp == null || !resp.isOK()) {
+                            for (TTCrashReport.Monitor o : batch) {
+                                failedReport.addReport(o.monitor, System.currentTimeMillis(), o.attempt + 1);
+                            }
+                        }
+                    }
+                } catch (Throwable ignore) {
                 }
-            } catch (Throwable ignore) {
             }
+        } catch (Throwable ignore) {
         }
         return failedReport;
     }
