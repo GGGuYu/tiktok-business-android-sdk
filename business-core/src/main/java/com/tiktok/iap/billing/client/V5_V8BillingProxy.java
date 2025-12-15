@@ -324,6 +324,7 @@ class V5_V8BillingProxy implements IBillingProxy {
         }
 
         try {
+            long maxTime = 0;
             List<TTPurchaseInfo> list = new ArrayList<>();
             for (Map.Entry<String, TTPayData> entry : map.entrySet()) {
                 try {
@@ -336,6 +337,8 @@ class V5_V8BillingProxy implements IBillingProxy {
                         info.setAutoTrack(true);
                         info.setSubs(isSubs);
                         list.add(info);
+
+                        maxTime = Math.max(maxTime, payData.purchaseTime);
                     }
                 } catch (Throwable e) {
                     ttLogger.error(e, "send history error");
@@ -343,6 +346,14 @@ class V5_V8BillingProxy implements IBillingProxy {
             }
             if (!list.isEmpty()) {
                 TikTokBusinessSdk.getAppEventLogger().trackPurchase(true, list);
+
+                if (maxTime > 0) {
+                    if (isSubs) {
+                        BillCache.getInstance().saveSUBSLast(maxTime);
+                    } else {
+                        BillCache.getInstance().saveINAPPLast(maxTime);
+                    }
+                }
             }
         } catch (Throwable ignore) {
         }
