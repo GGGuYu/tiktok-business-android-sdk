@@ -201,6 +201,7 @@ class V5_V8BillingProxy implements IBillingProxy {
 
         try {
             doQueryPurchaseHistory();
+            TTInAppPurchaseWrapper.hasReportedHistoryInLife = true;
         } catch (Throwable ignore) {
         }
     }
@@ -220,7 +221,8 @@ class V5_V8BillingProxy implements IBillingProxy {
                     }
                 });
             }
-        } catch (Throwable ignore) {
+        } catch (Throwable e) {
+            ttLogger.error(e, "query h inapp error");
         }
 
 
@@ -240,7 +242,8 @@ class V5_V8BillingProxy implements IBillingProxy {
                     }
                 });
             }
-        } catch (Throwable ignore) {
+        } catch (Throwable e) {
+            ttLogger.error(e, "query h subs error");
         }
     }
 
@@ -257,6 +260,7 @@ class V5_V8BillingProxy implements IBillingProxy {
                     JSONObject json = JSON.build(data);
                     String pid = JSON.getString(json, "productId");
                     if (!TextUtils.isEmpty(pid)) {
+                        checkDataAndAddNeedParam(json, null);
                         TTPayData pay = new TTPayData();
                         pay.productId = pid;
                         pay.data = json;
@@ -281,7 +285,8 @@ class V5_V8BillingProxy implements IBillingProxy {
             } else {
                 doQueryProductDetails(isSubs, idList);
             }
-        } catch (Throwable ignore) {
+        } catch (Throwable e) {
+            ttLogger.error(e, "query h product details error");
         }
     }
 
@@ -326,18 +331,29 @@ class V5_V8BillingProxy implements IBillingProxy {
                     TTPayData payData = entry.getValue();
                     JSONObject sku = mProductDetails.get(pid);
                     if (sku != null && sku.length() > 0) {
+                        checkDataAndAddNeedParam(payData.data, sku);
                         TTPurchaseInfo info = new TTPurchaseInfo(payData.data, sku);
                         info.setAutoTrack(true);
                         info.setSubs(isSubs);
                         list.add(info);
                     }
-                } catch (Throwable ignore) {
+                } catch (Throwable e) {
+                    ttLogger.error(e, "send history error");
                 }
             }
             if (!list.isEmpty()) {
                 TikTokBusinessSdk.getAppEventLogger().trackPurchase(true, list);
             }
         } catch (Throwable ignore) {
+        }
+    }
+
+    private void checkDataAndAddNeedParam(JSONObject purchase, JSONObject sku) {
+        if (purchase != null && purchase.isNull("orderId")) {
+            JSON.putObject(purchase, "orderId", "");
+        }
+        if (sku != null && sku.isNull("price")) {
+            JSON.putObject(sku, "price", "");
         }
     }
 
@@ -426,6 +442,7 @@ class V5_V8BillingProxy implements IBillingProxy {
                                     String jsonStr = BillUtils.parserJsonFromProductDetail(detail.toString());
                                     JSONObject json = JSON.build(jsonStr);
                                     if (json != null && json.length() > 0) {
+                                        checkDataAndAddNeedParam(null, json);
                                         mProductDetails.put(detail.getProductId(), json);
                                     }
                                 }
@@ -469,7 +486,9 @@ class V5_V8BillingProxy implements IBillingProxy {
                     mInitSuccess.set(billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK);
                 }
             });
-        } catch (Throwable ignore) {
+        } catch (Throwable e) {
+            ttLogger.error(e, "billing client init error");
+
             mIsInitLoading.set(false);
             mInitSuccess.set(false);
         }

@@ -26,6 +26,7 @@ public class TTInAppPurchaseWrapper {
 
     public static volatile int devAutoTrack = 0;//default0、1open、2close
 
+    public static volatile boolean hasReportedHistoryInLife = false;
     public static volatile boolean autoTrackPaymentEnable = true;
     public static Set<Integer> autoTrackPaymentTypes = new CopyOnWriteArraySet<>();
     public static volatile boolean autoTrackPaymentJson = true;
@@ -67,8 +68,9 @@ public class TTInAppPurchaseWrapper {
             }
             if (autoTrackPaymentEnable && autoTrackPaymentHistory) {
                 final String actName = activity.getClass().getSimpleName();
-                if (sPreviousActivity != null && sPreviousActivity.contains(ACT_BILLING)
-                        && !actName.contains(ACT_BILLING)) {
+                final boolean actIsBill = sPreviousActivity != null && sPreviousActivity.contains(ACT_BILLING)
+                        && !actName.contains(ACT_BILLING);
+                if (!hasReportedHistoryInLife || actIsBill) {
                     sExecutor.submit(new TTSafeRunnable() {
                         @Override
                         public void doSafeRun() {
@@ -98,9 +100,9 @@ public class TTInAppPurchaseWrapper {
             autoTrackPaymentHistoryINAPP = JSON.getInt(config, "auto_track_Payment_history_inapp_size", 200);
             autoTrackPaymentHistorySUBS = JSON.getInt(config, "auto_track_Payment_history_subs_size", 20);
 
-            autoTrackPaymentTypes.clear();
             JSONArray types = JSON.getJsonArray(config, "auto_track_Payment_types");
             if (types != null) {
+                autoTrackPaymentTypes.clear();
                 int count = types.length();
                 for (int i = 0; i < count; i++) {
                     try {
