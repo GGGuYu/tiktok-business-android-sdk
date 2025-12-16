@@ -8,6 +8,7 @@ package com.tiktok.appevents.edp;
 import android.text.TextUtils;
 
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.util.JSON;
 import com.tiktok.util.TTUtil;
 
 import org.json.JSONArray;
@@ -55,31 +56,45 @@ public class EDPConfig {
             return;
         }
         try {
-            enable_sdk = config.optBoolean(ConfigConst.ENABLE_SDK, false);
-            enable_app_launch_track = enable_sdk && config.optBoolean(ConfigConst.ENABLE_APP_LAUNCH_TRACK, false);
-            enable_page_show_track = enable_sdk && config.optBoolean(ConfigConst.ENABLE_PAGE_SHOW_TRACK, false);
-            enable_click_track = enable_sdk && config.optBoolean(ConfigConst.ENABLE_CLICK_TRACK, false);
-            enable_webview_request_track = enable_sdk && config.optBoolean(ConfigConst.ENABLE_WEBVIEW_REQUEST_TRACK, false);
-            enable_pay_show_track = enable_sdk && config.optBoolean(ConfigConst.ENABLE_PAY_SHOW_TRACK, false);
-            page_detail_upload_deep_count = config.optInt(ConfigConst.PAGE_DETAIL_UPLOAD_DEEP_COUNT, 0);
-            time_diff_frequency_control = config.optDouble(ConfigConst.TIME_DIFF_FREQUENCY_CONTROL, 0);
-            report_frequency_control = config.optDouble(ConfigConst.REPORT_FREQUENCY_CONTROL, 0.0);
+            enable_sdk = JSON.getBoolean(config, ConfigConst.ENABLE_SDK, false);
+            enable_app_launch_track = enable_sdk && JSON.getBoolean(config, ConfigConst.ENABLE_APP_LAUNCH_TRACK, false);
+            enable_page_show_track = enable_sdk && JSON.getBoolean(config, ConfigConst.ENABLE_PAGE_SHOW_TRACK, false);
+            enable_click_track = enable_sdk && JSON.getBoolean(config, ConfigConst.ENABLE_CLICK_TRACK, false);
+            enable_webview_request_track = enable_sdk && JSON.getBoolean(config, ConfigConst.ENABLE_WEBVIEW_REQUEST_TRACK, false);
+            enable_pay_show_track = enable_sdk && JSON.getBoolean(config, ConfigConst.ENABLE_PAY_SHOW_TRACK, false);
+            page_detail_upload_deep_count = JSON.getInt(config, ConfigConst.PAGE_DETAIL_UPLOAD_DEEP_COUNT, 0);
+            time_diff_frequency_control = JSON.getDouble(config, ConfigConst.TIME_DIFF_FREQUENCY_CONTROL, 0);
+            report_frequency_control = JSON.getDouble(config, ConfigConst.REPORT_FREQUENCY_CONTROL, 0.0);
             enable_sync_get_touch_info = config.optBoolean(ConfigConst.ENABLE_SYNC_GET_TOUCH_POSITION, false);
-            JSONArray buttonBlackList = config.optJSONArray(ConfigConst.BUTTON_BLACK_LIST);
-            JSONArray sensigFilteringRegexList = config.optJSONArray(ConfigConst.SENSIG_FILTERING_REGEX_LIST);
+            JSONArray buttonBlackList = JSON.getJsonArray(config, ConfigConst.BUTTON_BLACK_LIST);
             button_black_list.clear();
-            for (int i = 0; i < buttonBlackList.length(); i++) {
-                if (!TextUtils.isEmpty(buttonBlackList.getString(i))) {
-                    button_black_list.add(buttonBlackList.getString(i));
+            if (buttonBlackList != null) {
+                final int count = buttonBlackList.length();
+                for (int i = 0; i < count; i++) {
+                    try {
+                        final String btn = buttonBlackList.getString(i);
+                        if (!TextUtils.isEmpty(btn)) {
+                            button_black_list.add(btn);
+                        }
+                    } catch (Throwable ignore) {
+                    }
                 }
             }
-            if (!TextUtils.isEmpty(sensigFilteringRegexList.getString(0))) {
-                sensig_filtering_regex_list = sensigFilteringRegexList.getString(0);
-                sensig_filtering_regex_version = config.optInt(ConfigConst.SENSIG_FILTERING_REGEX_VERSION);
-                TTUtil.setSensigInfo(TikTokBusinessSdk.getApplicationContext(), new Sensig(sensig_filtering_regex_version, sensig_filtering_regex_list));
+
+            try {
+                JSONArray sensigFilteringRegexList = JSON.getJsonArray(config, ConfigConst.SENSIG_FILTERING_REGEX_LIST);
+                if (sensigFilteringRegexList != null) {
+                    final String regexStr = sensigFilteringRegexList.getString(0);
+                    if (!TextUtils.isEmpty(regexStr)) {
+                        sensig_filtering_regex_list = regexStr;
+                        sensig_filtering_regex_version = JSON.getInt(config, ConfigConst.SENSIG_FILTERING_REGEX_VERSION);
+                        TTUtil.setSensigInfo(TikTokBusinessSdk.getApplicationContext(), new Sensig(sensig_filtering_regex_version, sensig_filtering_regex_list));
+                    }
+                }
+            } catch (Throwable ignore) {
             }
-        } catch (Throwable throwable) {
-            throwable.printStackTrace();
+
+        } catch (Throwable ignore) {
         }
     }
 }

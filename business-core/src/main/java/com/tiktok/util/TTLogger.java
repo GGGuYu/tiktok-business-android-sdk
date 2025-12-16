@@ -14,7 +14,6 @@ import com.tiktok.TikTokBusinessSdk.LogLevel;
  * Logger util class
  */
 public class TTLogger {
-
     /**
      * loglevel
      */
@@ -25,7 +24,7 @@ public class TTLogger {
     private final String tag;
 
     public TTLogger(String tag, LogLevel logLevel) {
-        this.tag = tag;
+        this.tag = wrapTag(tag);
         this.logLevel = logLevel;
     }
 
@@ -34,7 +33,6 @@ public class TTLogger {
             return "null";
         }
         return extra.length == 0 ? format : String.format(format, extra);
-
     }
 
     public void info(String format, Object... extra) {
@@ -75,5 +73,9 @@ public class TTLogger {
 
     private boolean shouldLog(LogLevel level) {
         return logLevel.ordinal() >= level.ordinal();
+    }
+
+    private String wrapTag(String tag) {
+        return "TTSDK-" + (tag == null ? "" : tag);
     }
 }

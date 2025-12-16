@@ -9,13 +9,13 @@ package com.tiktok.appevents;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.TTUtil;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 class TTAppEventsQueue {
 
-    private static String TAG = TTAppEventsQueue.class.getCanonicalName();
-    private static List<TTAppEvent> memory = new ArrayList<>();
+    private static final String TAG = "TTAppEventsQueue";
+    private static volatile List<TTAppEvent> memory = new CopyOnWriteArrayList<>();
 
     private TTAppEventsQueue() {
     }
@@ -43,13 +43,13 @@ class TTAppEventsQueue {
 
     public static synchronized void clearAll() {
         TTUtil.checkThread(TAG);
-        memory = new ArrayList<>();
+        memory = new CopyOnWriteArrayList<>();
         notifyChange();
     }
 
     public static synchronized List<TTAppEvent> exportAllEvents() {
         List<TTAppEvent> appEvents = memory;
-        memory = new ArrayList<>();
+        memory = new CopyOnWriteArrayList<>();
         notifyChange();
         return appEvents;
     }

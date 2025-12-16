@@ -7,7 +7,8 @@
 package com.tiktok.appevents.base;
 
 
-import org.json.JSONException;
+import com.tiktok.util.JSON;
+
 import org.json.JSONObject;
 
 public class TTBaseEvent {
@@ -30,16 +31,19 @@ public class TTBaseEvent {
     }
 
     public static class Builder {
-        public JSONObject properties = new JSONObject();
+        public JSONObject properties = JSON.build();
         public String eventName;
         public String eventId;
-        public Builder(String eventName){
+
+        public Builder(String eventName) {
             this.eventName = eventName;
         }
-        public Builder(String eventName, String eventId){
+
+        public Builder(String eventName, String eventId) {
             this.eventName = eventName;
             this.eventId = eventId;
         }
+
         public Builder addProperty(String key, Object value) {
             safeAddProperty(key, value);
             return this;
@@ -72,15 +76,13 @@ public class TTBaseEvent {
 
         private void safeAddProperty(String key, Object value) {
             try {
-                properties.put(key, value);
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
+                JSON.putObject(properties, key, value);
+            } catch (Throwable ignore) {
             }
         }
 
         public TTBaseEvent build() {
-            TTBaseEvent event = new TTBaseEvent(eventName, properties, eventId);
-            return event;
+            return new TTBaseEvent(eventName, properties, eventId);
         }
     }
 }

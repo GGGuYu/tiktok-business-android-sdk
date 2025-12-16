@@ -9,6 +9,8 @@ package com.tiktok.appevents.contents;
 
 import android.text.TextUtils;
 
+import com.tiktok.util.JSON;
+
 import org.json.JSONObject;
 
 public class TTContentParams {
@@ -81,30 +83,29 @@ public class TTContentParams {
         }
     }
 
-    public JSONObject toJSONObject(){
+    public JSONObject toJSONObject() {
         JSONObject jsonObject = null;
-        try{
-            jsonObject = new JSONObject();
-            if(quantityAvailable) {
-                jsonObject.put("quantity", quantity);
+        try {
+            jsonObject = JSON.build();
+            if (quantityAvailable) {
+                JSON.putInt(jsonObject, "quantity", quantity);
             }
-            if(!TextUtils.isEmpty(contentId)){
-                jsonObject.put("content_id", contentId);
+            if (!TextUtils.isEmpty(contentId)) {
+                JSON.putObject(jsonObject, "content_id", contentId);
             }
-            if(!TextUtils.isEmpty(contentCategory)) {
-                jsonObject.put("content_category", contentCategory);
+            if (!TextUtils.isEmpty(contentCategory)) {
+                JSON.putObject(jsonObject, "content_category", contentCategory);
             }
-            if(!TextUtils.isEmpty(contentName)) {
-                jsonObject.put("content_name", contentName);
+            if (!TextUtils.isEmpty(contentName)) {
+                JSON.putObject(jsonObject, "content_name", contentName);
             }
-            if(!TextUtils.isEmpty(brand)) {
-                jsonObject.put("brand", brand);
+            if (!TextUtils.isEmpty(brand)) {
+                JSON.putObject(jsonObject, "brand", brand);
             }
-            if (priceAvailable && price != Float.NaN) {
-                jsonObject.put("price", String.valueOf(price));
+            if (priceAvailable && !Float.isNaN(price)) {
+                JSON.putObject(jsonObject, "price", String.valueOf(price));
             }
-        }catch (Throwable e){
-            e.printStackTrace();
+        } catch (Throwable ignore) {
         }
         return jsonObject;
     }
