@@ -7,6 +7,7 @@ public class ProxyOnTouchListener implements View.OnTouchListener {
 
     ITouchListener listener;
     View.OnTouchListener originOnTouchListener;
+
     public ProxyOnTouchListener(ITouchListener listener, View.OnTouchListener originOnTouchListener) {
         this.listener = listener;
         this.originOnTouchListener = originOnTouchListener;
@@ -15,11 +16,14 @@ public class ProxyOnTouchListener implements View.OnTouchListener {
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         boolean consumed = false;
-        if (originOnTouchListener != null){
+        if (originOnTouchListener != null) {
             consumed = originOnTouchListener.onTouch(v, event);
         }
-        if (listener != null){
-            listener.onTouch(v, event);
+        try {
+            if (listener != null) {
+                listener.onTouch(v, event);
+            }
+        } catch (Throwable ignore) {
         }
         return consumed;
     }

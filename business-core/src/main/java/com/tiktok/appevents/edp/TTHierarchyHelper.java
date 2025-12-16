@@ -5,17 +5,6 @@
  ******************************************************************************/
 package com.tiktok.appevents.edp;
 
-import static com.tiktok.appevents.edp.EDPConfig.button_black_list;
-import static com.tiktok.appevents.edp.EDPConfig.enable_click_track;
-import static com.tiktok.appevents.edp.EDPConfig.enable_sync_get_touch_info;
-import static com.tiktok.appevents.edp.EDPConfig.enable_webview_request_track;
-import static com.tiktok.appevents.edp.EDPConfig.page_detail_upload_deep_count;
-import static com.tiktok.appevents.edp.EDPConfig.sensig_filtering_regex_list;
-import static com.tiktok.appevents.edp.EDPConfig.time_diff_frequency_control;
-import static com.tiktok.appevents.edp.TTEDPEventTrack.LAST_CLICK_TS;
-import static com.tiktok.appevents.edp.TTEDPEventTrack.isSending;
-import static com.tiktok.util.RegexUtil.replaceAllToHash;
-
 import android.app.Activity;
 import android.os.Handler;
 import android.os.Looper;
@@ -29,6 +18,8 @@ import android.widget.TextView;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.appevents.edp.proxy.ITouchListener;
 import com.tiktok.appevents.edp.proxy.TouchProxyHelper;
+import com.tiktok.util.JSON;
+import com.tiktok.util.RegexUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,181 +27,237 @@ import org.json.JSONObject;
 import java.lang.ref.WeakReference;
 
 public class TTHierarchyHelper {
-    public static Handler mHandler;
+    public static volatile Handler mHandler;
+
     public static JSONObject getViewHierarchy(WeakReference<View> rootView, int hierarchy) {
-        JSONObject jsonObject = new JSONObject();
+        JSONObject jsonObject = JSON.build();
         try {
             if (hierarchy <= 0) {
                 return jsonObject;
             }
-            jsonObject.put("class_name", rootView.get().getClass().getCanonicalName());
-            if (rootView.get() instanceof TextView) {
+
+            View view = rootView.get();
+
+            JSON.putObject(jsonObject, "class_name", view.getClass().getCanonicalName());
+            if (view instanceof TextView) {
                 String text = "";
-                if (((TextView) rootView.get()).getText() != null) {
-                    text = ((TextView) rootView.get()).getText().toString();
+                if (((TextView) view).getText() != null) {
+                    text = ((TextView) view).getText().toString();
                 }
                 if (!TextUtils.isEmpty(text)) {
-                    text = replaceAllToHash(sensig_filtering_regex_list, text);
+                    text = RegexUtil.replaceAllToHash(EDPConfig.sensig_filtering_regex_list, text);
                 }
-                jsonObject.put("text", text);
-                jsonObject.put("font_size", ((TextView) rootView.get()).getTextSize());
+                JSON.putObject(jsonObject, "text", text);
+                JSON.putDouble(jsonObject, "font_size", ((TextView) view).getTextSize());
             }
             int[] location = new int[2];
-            rootView.get().getLocationOnScreen(location);
-            jsonObject.put("left", location[0]);
-            jsonObject.put("top", location[1]);
-            jsonObject.put("width", rootView.get().getMeasuredWidth());
-            jsonObject.put("height", rootView.get().getMeasuredHeight());
-            jsonObject.put("scroll_x", rootView.get().getScrollX());
-            jsonObject.put("scroll_y", rootView.get().getScrollY());
-            if (rootView.get() instanceof ViewGroup) {
-                JSONArray jsonArray = new JSONArray();
-                for (int i = 0; i < ((ViewGroup) rootView.get()).getChildCount(); i++) {
-                    JSONObject jsonItem = getViewHierarchy((new WeakReference<>(((ViewGroup) (rootView.get())).getChildAt(i))), hierarchy-1);
-                    jsonArray.put(jsonItem);
+            view.getLocationOnScreen(location);
+            JSON.putInt(jsonObject, "left", location[0]);
+            JSON.putInt(jsonObject, "top", location[1]);
+            JSON.putInt(jsonObject, "width", view.getMeasuredWidth());
+            JSON.putInt(jsonObject, "height", view.getMeasuredHeight());
+            JSON.putInt(jsonObject, "scroll_x", view.getScrollX());
+            JSON.putInt(jsonObject, "scroll_y", view.getScrollY());
+            if (view instanceof ViewGroup) {
+                JSONArray jsonArray = JSON.buildArr();
+                ViewGroup vp = (ViewGroup) view;
+                int count = vp.getChildCount();
+                for (int i = 0; i < count; i++) {
+                    JSONObject jsonItem = getViewHierarchy((new WeakReference<>(vp.getChildAt(i))), hierarchy - 1);
+                    JSON.putArr(jsonArray, jsonItem);
                 }
-                try {
-                    jsonObject.put("child_views", jsonArray);
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
+                JSON.putObject(jsonObject, "child_views", jsonArray);
             }
-        }catch (Throwable e){
-
+        } catch (Throwable ignore) {
         }
         return jsonObject;
     }
 
-    public static void proxyOnTouch(WeakReference<View> rootView, WeakReference<Activity> activity){
-        if(!enable_click_track) {
-            return;
-        }
-        TouchProxyHelper.proxy(rootView, new ITouchListener() {
-            long touchDown = 0;
+    public static void proxyOnTouch(WeakReference<View> rootView, WeakReference<Activity> activity) {
+        try {
+            if (!EDPConfig.enable_click_track) {
+                return;
+            }
+            if (rootView == null) {
+                return;
+            }
+            final View view = rootView.get();
+            if (view == null) {
+                return;
+            }
+            final Activity act = activity.get();
+            if (act == null || act.isFinishing() || act.isDestroyed()) {
+                return;
+            }
+            TouchProxyHelper.proxy(rootView, new ITouchListener() {
+                long touchDown = 0;
 
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                try {
-                    switch (event.getAction()) {
-                        case MotionEvent.ACTION_DOWN:
-                            touchDown = System.currentTimeMillis();
-                            break;
-                        case MotionEvent.ACTION_UP:
-                            if (activity == null || activity.get() == null) {
-                                return false;
-                            }
-                            if (button_black_list.contains(rootView.get().getClass().getCanonicalName())) {
-                                return false;
-                            }
-                            if(!TTEDPEventTrack.checkUpload() || isSending){
-                                return false;
-                            }
-                            if(System.currentTimeMillis() - LAST_CLICK_TS <= time_diff_frequency_control * 1000){
-                                return false;
-                            }
-                            isSending = true;
-                            String className = v.getClass().getCanonicalName();
-                            if (enable_sync_get_touch_info) {
+                @Override
+                public boolean onTouch(View v, MotionEvent event) {
+                    if (!EDPConfig.enable_click_track) {
+                        return false;
+                    }
+                    if (act == null || act.isFinishing() || act.isDestroyed()) {
+                        return false;
+                    }
+                    if (view == null) {
+                        return false;
+                    }
+                    try {
+                        switch (event.getAction()) {
+                            case MotionEvent.ACTION_DOWN:
+                                touchDown = System.currentTimeMillis();
+                                break;
+                            case MotionEvent.ACTION_UP:
+                                if (act == null || act.isFinishing() || act.isDestroyed()) {
+                                    return false;
+                                }
+                                if (EDPConfig.button_black_list.contains(view.getClass().getCanonicalName())) {
+                                    return false;
+                                }
+                                if (!TTEDPEventTrack.checkUpload() || TTEDPEventTrack.isSending) {
+                                    return false;
+                                }
+                                if (System.currentTimeMillis() - TTEDPEventTrack.LAST_CLICK_TS <= EDPConfig.time_diff_frequency_control * 1000) {
+                                    return false;
+                                }
+                                TTEDPEventTrack.isSending = true;
+                                String className = v.getClass().getCanonicalName();
                                 float rawX = event.getRawX();
                                 float rawY = event.getRawY();
                                 TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
                                     @Override
                                     public void run() {
                                         try {
-                                            TTEDPEventTrack.trackClick(className, rawX, rawY, rootView.get().getMeasuredWidth(),
-                                                    rootView.get().getMeasuredHeight(), rootView.get() instanceof TextView ? ((TextView) (rootView.get())).getText().toString() : "",
-                                                    activity.get().getClass().getSimpleName(), TTHierarchyHelper.getViewHierarchy(new WeakReference<>(activity.get().getWindow().getDecorView()), page_detail_upload_deep_count),
-                                                    getViewHierarchyCount(new WeakReference<>(activity.get().getWindow().getDecorView())),
-                                                    System.currentTimeMillis() - touchDown);
-                                        } catch (Throwable e) {
+                                            if (!EDPConfig.enable_click_track) {
+                                                return;
+                                            }
+                                            if (act == null || act.isFinishing() || act.isDestroyed()) {
+                                                return;
+                                            }
+                                            if (view == null) {
+                                                return;
+                                            }
 
+                                            View decorView = act.getWindow().getDecorView();
+
+                                            TTEDPEventTrack.trackClick(className, rawX, rawY, view.getMeasuredWidth(),
+                                                    view.getMeasuredHeight(), view instanceof TextView ? ((TextView) (view)).getText().toString() : "",
+                                                    act.getClass().getSimpleName(), TTHierarchyHelper.getViewHierarchy(new WeakReference<>(decorView), EDPConfig.page_detail_upload_deep_count),
+                                                    getViewHierarchyCount(new WeakReference<>(decorView)),
+                                                    System.currentTimeMillis() - touchDown);
+                                        } catch (Throwable ignore) {
                                         }
+
+                                        TTEDPEventTrack.isSending = false;
                                     }
                                 });
-                            } else {
-                                TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        try {
-                                            TTEDPEventTrack.trackClick(className, event.getRawX(), event.getRawY(), rootView.get().getMeasuredWidth(),
-                                                    rootView.get().getMeasuredHeight(), rootView.get() instanceof TextView ? ((TextView) (rootView.get())).getText().toString() : "",
-                                                    activity.get().getClass().getSimpleName(), TTHierarchyHelper.getViewHierarchy(new WeakReference<>(activity.get().getWindow().getDecorView()), page_detail_upload_deep_count),
-                                                    getViewHierarchyCount(new WeakReference<>(activity.get().getWindow().getDecorView())),
-                                                    System.currentTimeMillis() - touchDown);
-                                        } catch (Throwable e) {
-
-                                        }
-                                    }
-                                });
-                            }
-                            break;
+                                break;
+                        }
+                    } catch (Throwable ignore) {
                     }
-                }catch (Throwable e){
-
+                    return false;
                 }
-                return false;
-            }
-        });
+            });
+        } catch (Throwable ignore) {
+        }
     }
 
-    public static int getViewHierarchyCount(WeakReference<View> rootView){
+    public static int getViewHierarchyCount(WeakReference<View> rootView) {
         try {
-            if (rootView.get() instanceof ViewGroup) {
+            if (rootView == null) {
+                return 0;
+            }
+
+            View view = rootView.get();
+            if (view == null) {
+                return 0;
+            }
+
+            if (view instanceof ViewGroup) {
+                ViewGroup vp = (ViewGroup) view;
+                int count = vp.getChildCount();
                 int viewHierarchyCount = 1;
-                for (int i = 0; i < ((ViewGroup) (rootView.get())).getChildCount(); i++) {
-                    viewHierarchyCount = Math.max(getViewHierarchyCount(new WeakReference<>(((ViewGroup) (rootView.get())).getChildAt(i))) + 1, viewHierarchyCount);
+                for (int i = 0; i < count; i++) {
+                    viewHierarchyCount = Math.max(getViewHierarchyCount(new WeakReference<>(vp.getChildAt(i))) + 1, viewHierarchyCount);
                 }
                 return viewHierarchyCount;
             } else {
                 return 1;
             }
-        }catch (Throwable e){
+        } catch (Throwable ignore) {
             return 0;
         }
     }
 
     public static Handler getHandler() {
         if (mHandler == null) {
-            mHandler = new Handler(Looper.getMainLooper());
+            synchronized (TTHierarchyHelper.class) {
+                if (mHandler == null) {
+                    mHandler = new Handler(Looper.getMainLooper());
+                }
+            }
         }
         return mHandler;
     }
 
     public static int getViewHierarchyCountAndRegisterOnTouch(WeakReference<View> rootView, WeakReference<Activity> activity) {
         try {
-            if (rootView.get() instanceof WebView) {
-                if (enable_webview_request_track) {
-                    getHandler().post(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                String url = ((WebView) rootView.get()).getOriginalUrl();
+            Activity act = activity.get();
+            if (act == null || act.isFinishing() || act.isDestroyed()) {
+                return 0;
+            }
+
+            View view = rootView.get();
+            if (view == null) {
+                return 0;
+            }
+
+            if (EDPConfig.enable_click_track) {
+                getHandler().post(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            proxyOnTouch(rootView, activity);
+                        } catch (Throwable ignore) {
+                        }
+                    }
+                });
+            }
+
+            if (EDPConfig.enable_webview_request_track && view instanceof WebView) {
+                getHandler().post(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (EDPConfig.enable_webview_request_track) {
+                                WebView web = (WebView) view;
+                                String url = web.getOriginalUrl();
                                 if (!TextUtils.isEmpty(url)) {
                                     TTEDPEventTrack.trackWebviewRequest(url);
                                 }
-                            } catch (Throwable e) {
-
                             }
+                        } catch (Throwable ignore) {
                         }
-                    });
-                }
+                    }
+                });
             }
-            getHandler().post(new Runnable() {
-                @Override
-                public void run() {
-                    proxyOnTouch(rootView, activity);
-                }
-            });
-            if (rootView.get() instanceof ViewGroup) {
+
+            if (view instanceof ViewGroup) {
+                ViewGroup vp = (ViewGroup) view;
+                int count = vp.getChildCount();
                 int viewHierarchyCount = 1;
-                for (int i = 0; i < ((ViewGroup) (rootView.get())).getChildCount(); i++) {
-                    viewHierarchyCount = Math.max(getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(((ViewGroup) (rootView.get())).getChildAt(i)), activity) + 1, viewHierarchyCount);
+                for (int i = 0; i < count; i++) {
+                    viewHierarchyCount = Math.max(getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(vp.getChildAt(i)), activity) + 1, viewHierarchyCount);
                 }
-                ((ViewGroup) (rootView.get())).setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
+                vp.setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
 
                     @Override
                     public void onChildViewAdded(View parent, View child) {
-                        getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(child), activity);
+                        try {
+                            getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(child), activity);
+                        } catch (Throwable ignore) {
+                        }
                     }
 
                     @Override
@@ -222,7 +269,7 @@ public class TTHierarchyHelper {
             } else {
                 return 1;
             }
-        }catch (Throwable e){
+        } catch (Throwable ignore) {
             return 0;
         }
     }

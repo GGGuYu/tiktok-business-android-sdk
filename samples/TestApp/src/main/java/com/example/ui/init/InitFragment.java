@@ -173,12 +173,12 @@ public class InitFragment extends Fragment {
                     InitViewModel.initWithCallback = false;
                 }
                 if(appId.getText().toString() == null || appId.getText().toString().isEmpty()){
-                    ttConfig.setAppId("com.tiktok.iabtest");
+                    ttConfig.setAppId("com.zhiliaoapp.musically");
                 } else {
                     ttConfig.setAppId(appId.getText().toString());
                 }
                 if(ttAppId.getText().toString() == null || ttAppId.getText().toString().isEmpty()){
-                    ttConfig.setTTAppId("123456");
+                    ttConfig.setTTAppId("7351070180723720194");
                 } else {
                     ttConfig.setTTAppId(ttAppId.getText().toString());
                 }

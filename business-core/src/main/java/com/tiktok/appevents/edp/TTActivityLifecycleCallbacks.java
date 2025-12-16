@@ -5,23 +5,22 @@
  ******************************************************************************/
 package com.tiktok.appevents.edp;
 
-import static com.tiktok.appevents.edp.EDPConfig.enable_app_launch_track;
-import static com.tiktok.appevents.edp.EDPConfig.enable_page_show_track;
-import static com.tiktok.appevents.edp.EDPConfig.page_detail_upload_deep_count;
-
 import android.app.Activity;
 import android.app.Application;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.Window;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.iap.TTInAppPurchaseWrapper;
 
 import java.lang.ref.WeakReference;
 
-public class TTActivityLifecycleCallbacks implements Application.ActivityLifecycleCallbacks{
+public class TTActivityLifecycleCallbacks implements Application.ActivityLifecycleCallbacks {
     private boolean mIsBackground = true;
 
     private int mRefCount = 0;
@@ -47,69 +46,105 @@ public class TTActivityLifecycleCallbacks implements Application.ActivityLifecyc
             registerEDPListener(activityWeakReference, index, mIsBackground);
         }
     }
+
     private void registerEDPListener(WeakReference<Activity> activity, int index, boolean isBackground) {
+        if (!EDPConfig.enable_sdk) {
+            return;
+        }
         try {
-            activity.get().getWindow().getDecorView().post(new Runnable() {
+            Activity act = activity.get();
+            if (act == null || act.isFinishing() || act.isDestroyed()) {
+                return;
+            }
+            Window window = act.getWindow();
+            if (window == null) {
+                return;
+            }
+
+            View decorView = window.getDecorView();
+            decorView.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (enable_page_show_track) {
-                        if(TTEDPEventTrack.pageShowIsSending){
-                            return;
+                    //double check
+                    if (act == null || act.isFinishing() || act.isDestroyed()) {
+                        return;
+                    }
+
+                    try {
+                        if (EDPConfig.enable_sdk && EDPConfig.enable_page_show_track) {
+                            if (TTEDPEventTrack.pageShowIsSending) {
+                                return;
+                            }
+                            TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (TTEDPEventTrack.pageShowIsSending) {
+                                        return;
+                                    }
+                                    try {
+                                        TTEDPEventTrack.pageShowIsSending = true;
+                                        TTEDPEventTrack.trackPageShow(act.getClass().getSimpleName(), index, isBackground,
+                                                TTHierarchyHelper.getViewHierarchy(new WeakReference<>(decorView), EDPConfig.page_detail_upload_deep_count),
+                                                TTHierarchyHelper.getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(decorView), activity));
+                                        TTEDPEventTrack.pageShowIsSending = false;
+                                    } catch (Throwable ignore) {
+                                    }
+                                }
+                            });
                         }
-                        TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    TTEDPEventTrack.pageShowIsSending = true;
-                                    TTEDPEventTrack.trackPageShow(activity.get().getClass().getSimpleName(), index, isBackground,
-                                            TTHierarchyHelper.getViewHierarchy(new WeakReference<>(activity.get().getWindow().getDecorView()), page_detail_upload_deep_count),
-                                            TTHierarchyHelper.getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(activity.get().getWindow().getDecorView()), activity));
-                                }catch (Throwable e){
+                    } catch (Throwable ignore) {
+                    }
 
+                    try {
+                        if (EDPConfig.enable_sdk && EDPConfig.enable_click_track) {
+                            TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        TTHierarchyHelper.getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(decorView), activity);
+                                    } catch (Throwable ignore) {
+                                    }
                                 }
-                            }
-                        });
-                    } else {
-                        TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    TTHierarchyHelper.getViewHierarchyCountAndRegisterOnTouch(new WeakReference<>(activity.get().getWindow().getDecorView()), activity);
-                                }catch (Throwable e){
-
-                                }
-                            }
-                        });
+                            });
+                        }
+                    } catch (Throwable ignore) {
                     }
                 }
             });
-        }catch (Throwable e){
-
+        } catch (Throwable ignore) {
         }
     }
 
     @Override
     public void onActivityResumed(@NonNull Activity activity) {
-        if(activityWeakReference == null || activityWeakReference.get() == null || activityWeakReference.get() != activity){
+        if (activityWeakReference == null || activityWeakReference.get() == null || activityWeakReference.get() != activity) {
             index++;
         }
         activityWeakReference = new WeakReference<>(activity);
-        if (enable_app_launch_track && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 && mIsBackground && activity.getReferrer() != null) {
-            TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
-                @Override
-                public void run() {
-                    try{
-                        TTEDPEventTrack.trackAppLaunch(activityWeakReference.get().getReferrer().toString(),
-                                activityWeakReference.get().getIntent() != null && activityWeakReference.get().getIntent().getData() != null
-                                        ? activityWeakReference.get().getIntent().getData().toString() : "");
-                    }catch (Throwable e){
 
+        TTInAppPurchaseWrapper.tryReportIapEvent(activity);
+
+        if (EDPConfig.enable_sdk && EDPConfig.enable_app_launch_track && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 && mIsBackground && activity.getReferrer() != null) {
+            try {
+                TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (EDPConfig.enable_sdk && EDPConfig.enable_app_launch_track) {
+                            try {
+                                TTEDPEventTrack.trackAppLaunch(activityWeakReference.get().getReferrer().toString(),
+                                        activityWeakReference.get().getIntent() != null && activityWeakReference.get().getIntent().getData() != null
+                                                ? activityWeakReference.get().getIntent().getData().toString() : "");
+                            } catch (Throwable ignore) {
+                            }
+                        }
                     }
-                }
-            });
+                });
+            } catch (Throwable ignore) {
+            }
         }
+
         final boolean isBackground = mIsBackground;
-        if(TikTokBusinessSdk.isInitialized()) {
+        if (TikTokBusinessSdk.isInitialized()) {
             hasSendPageShow = true;
             registerEDPListener(activityWeakReference, index, isBackground);
         }

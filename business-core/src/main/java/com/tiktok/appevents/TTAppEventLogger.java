@@ -6,19 +6,14 @@
 
 package com.tiktok.appevents;
 
-import static com.tiktok.TikTokBusinessSdk.INVALID_ID;
 import static com.tiktok.appevents.ErrorData.TT_DDL_CODE_HTTP_ERROR;
-import static com.tiktok.appevents.ErrorData.TT_DDL_MSG_HTTP_ERROR;
-import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.ENABLE_SDK;
 import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.EDP_NATIVE_SDK_CONFIG;
-import static com.tiktok.appevents.edp.EDPConfig.ConfigConst.EDP_UNITY_SDK_CONFIG;
-import static com.tiktok.util.TTConst.ERROR_MESSAGE_INVALID_ID;
+import static com.tiktok.appevents.edp.TTEDPEventTrack.trackFirstAppLaunch;
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
-import static com.tiktok.appevents.edp.TTEDPEventTrack.trackFirstAppLaunch;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -28,15 +23,20 @@ import androidx.lifecycle.ProcessLifecycleOwner;
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.appevents.edp.EDPConfig;
 import com.tiktok.appevents.edp.TTEDPEventTrack;
+import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.unity.TTUnityBridge;
-import com.tiktok.util.*;
+import com.tiktok.util.HttpRequestUtil;
+import com.tiktok.util.JSON;
+import com.tiktok.util.NetworkTimeout;
+import com.tiktok.util.SystemInfoUtil;
+import com.tiktok.util.TTConst;
+import com.tiktok.util.TTHandlerUtil;
+import com.tiktok.util.TTLogger;
+import com.tiktok.util.TTUtil;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TTAppEventLogger {
     static final String SKIP_FLUSHING_BECAUSE_GLOBAL_SWITCH_IS_TURNED_OFF = "Skip flushing because global switch is turned off";
     static final String SKIP_FLUSHING_BECAUSE_GLOBAL_CONFIG_IS_NOT_FETCHED = "Skip flushing because global config is not fetched";
-    static final String TAG = TTAppEventLogger.class.getName();
+    static final String TAG = "TTAppEventLogger";
 
     // every TIME_BUFFER seconds, a flush task will be pushed to the execution queue
     private static int TIME_BUFFER;
@@ -72,15 +72,14 @@ public class TTAppEventLogger {
 
     // for internal debug purpose
     int flushId = 0;
-    public static boolean autoTrackRetentionEnable = true;
-    public static boolean autoTrackPaymentEnable = true;
+    public static volatile boolean autoTrackRetentionEnable = true;
 
     // similar to what javascript has, so that all the internal tasks are executed in a waterfall fashion, avoiding race conditions
-    static ScheduledExecutorService eventLoop = Executors.newSingleThreadScheduledExecutor(new TTThreadFactory());
+    static final ScheduledExecutorService eventLoop = Executors.newSingleThreadScheduledExecutor(new TTThreadFactory());
     ScheduledFuture<?> future = null;
 
     // used by internal monitor
-    static ScheduledExecutorService timerService = Executors.newSingleThreadScheduledExecutor(new TTThreadFactory());
+    static final ScheduledExecutorService timerService = Executors.newSingleThreadScheduledExecutor(new TTThreadFactory());
     ScheduledFuture<?> timeFuture = null;
     private final Runnable batchFlush = () -> flush(FlushReason.TIMER);
 
@@ -88,8 +87,8 @@ public class TTAppEventLogger {
 
     static boolean metricsEnabled = true;
     private final static TTLifecycleListener mLifecycleListener = new TTLifecycleListener();
-    Handler uiThreadHandler = new Handler(Looper.getMainLooper());
-    private Runnable heartRunnable = new Runnable() {
+    final Handler uiThreadHandler = new Handler(Looper.getMainLooper());
+    private final Runnable heartRunnable = new Runnable() {
         @Override
         public void run() {
             try {
@@ -129,53 +128,52 @@ public class TTAppEventLogger {
             metricsEnabled = false;
         }
 
-        /** ActivityLifecycleCallbacks & LifecycleObserver */
-        TTActivityLifecycleCallbacksListener activityLifecycleCallbacks = new TTActivityLifecycleCallbacksListener(this);
+        /* ActivityLifecycleCallbacks & LifecycleObserver */
+        final Runnable lifeRun = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    TTActivityLifecycleCallbacksListener activityLifecycleCallbacks = new TTActivityLifecycleCallbacksListener(TTAppEventLogger.this);
+                    TTAppEventLogger.this.lifecycle.addObserver(activityLifecycleCallbacks);
+                    TikTokBusinessSdk.getApplicationContext().registerActivityLifecycleCallbacks(mLifecycleListener);
+                } catch (Throwable ignore) {
+                }
+            }
+        };
         try {
             if (Looper.myLooper() == Looper.getMainLooper()) {
-                TTAppEventLogger.this.lifecycle.addObserver(activityLifecycleCallbacks);
+                lifeRun.run();
             } else {
-                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                    @Override
-                    public void run() {
-                        TTAppEventLogger.this.lifecycle.addObserver(activityLifecycleCallbacks);
-                    }
-                });
+                uiThreadHandler.post(lifeRun);
             }
-            TikTokBusinessSdk.getApplicationContext().registerActivityLifecycleCallbacks(mLifecycleListener);
-        }catch (Throwable throwable){
-
+        } catch (Throwable ignore) {
         }
 
         autoEventsManager = new TTAutoEventsManager(this);
     }
 
-    public void initConfig(long initTimeMS, final TikTokBusinessSdk.TTInitCallback callback, AtomicBoolean sdkInitialized){
-        addToQ(() -> {
-            startHeart();
-        });
-        addToQ(SystemInfoUtil::initAppSessionId);
-        addToQ(SystemInfoUtil::initInstallReferrer);
-        addToQ(SystemInfoUtil::updateSensigInfo);
-        addToQ(SystemInfoUtil::initUserAgent);
-        addToQ(TTAppEventsQueue::clearAll);
-        addToQ(TTEdpAppEventsQueue::clearAll);
+    public void initConfig(long initTimeMS, final TikTokBusinessSdk.TTInitCallback callback, AtomicBoolean sdkInitialized) {
         addToQ(() -> {
             try {
-                if (TextUtils.isEmpty(TikTokBusinessSdk.getTTAppId()) || TextUtils.isEmpty(TikTokBusinessSdk.getAppId())) {
-                    if (callback != null) {
-                        callback.fail(INVALID_ID, ERROR_MESSAGE_INVALID_ID);
-                    }
-                } else {
-                    sdkInitialized.set(true);
-                    if (callback != null) {
-                        callback.success();
-                    }
+                startHeart();
+
+                SystemInfoUtil.initAppSessionId();
+                SystemInfoUtil.initInstallReferrer();
+                SystemInfoUtil.updateSensigInfo();
+                SystemInfoUtil.initUserAgent();
+
+                TTAppEventsQueue.clearAll();
+                TTEdpAppEventsQueue.clearAll();
+
+                sdkInitialized.set(true);
+                if (callback != null) {
+                    callback.success();
                 }
             } catch (Throwable e) {
-                e.printStackTrace();
+                logger.error(e, "init error");
             }
         });
+
         fetchGlobalConfig(0);
         monitorMetric("init_start", TTUtil.getMetaWithTS(initTimeMS), null);
     }
@@ -188,6 +186,10 @@ public class TTAppEventLogger {
     }
 
     public void trackPurchase(List<TTPurchaseInfo> purchaseInfos) {
+        trackPurchase(false, purchaseInfos);
+    }
+
+    public void trackPurchase(boolean isHistory, List<TTPurchaseInfo> purchaseInfos) {
         if (!TikTokBusinessSdk.isSystemActivated()) {
             logger.info("Global switch is off, ignore track purchase");
             return;
@@ -200,15 +202,18 @@ public class TTAppEventLogger {
             for (TTPurchaseInfo purchaseInfo : purchaseInfos) {
                 JSONObject property = TTInAppPurchaseManager.getPurchaseProps(purchaseInfo);
                 if (property != null) {
-                    track("Purchase", property, purchaseInfo.getEventId());
+                    track(isHistory ? "__purchase_history" : "Purchase", property, purchaseInfo.getEventId());
                 }
             }
         });
     }
 
     public void startHeart() {
-        TTHandlerUtil.getInstance().removeCallbacks(heartRunnable);
-        TTHandlerUtil.getInstance().postDelayed(heartRunnable, 60000);
+        try {
+            TTHandlerUtil.getInstance().removeCallbacks(heartRunnable);
+            TTHandlerUtil.getInstance().postDelayed(heartRunnable, 60000);
+        } catch (Throwable ignore) {
+        }
     }
 
     public void closeHeart() {
@@ -234,11 +239,11 @@ public class TTAppEventLogger {
     private void doStartScheduler(int interval, boolean immediate) {
         try {
             if (future == null) {
-                future = eventLoop.scheduleAtFixedRate(batchFlush, immediate ? 0 : interval, interval, TimeUnit.SECONDS);
+                future = eventLoop.scheduleWithFixedDelay(batchFlush, immediate ? 0 : interval, interval, TimeUnit.SECONDS);
             }
             if (timeFuture == null && TikTokBusinessSdk.nextTimeFlushListener != null) {
                 counter = interval;
-                timeFuture = timerService.scheduleAtFixedRate(() -> {
+                timeFuture = timerService.scheduleWithFixedDelay(() -> {
                     TikTokBusinessSdk.nextTimeFlushListener.timeLeft(counter);
                     if (counter == 0) {
                         counter = interval;
@@ -246,7 +251,7 @@ public class TTAppEventLogger {
                     counter--;
                 }, 0, 1, TimeUnit.SECONDS);
             }
-        }catch (Throwable e){
+        } catch (Throwable e) {
             TikTokBusinessSdk.setSdkGlobalSwitch(false);
         }
     }
@@ -264,8 +269,8 @@ public class TTAppEventLogger {
                 timeFuture.cancel(false);
                 timeFuture = null;
             }
-        }catch (Throwable e){
-            logger.error(e,"stop scheduler exception");
+        } catch (Throwable e) {
+            logger.error(e, "stop scheduler exception");
         }
     }
 
@@ -273,28 +278,32 @@ public class TTAppEventLogger {
                             @Nullable String externalUserName,
                             @Nullable String phoneNumber,
                             @Nullable String email) {
-        TTUserInfo sharedInstance = TTUserInfo.sharedInstance;
-        if (sharedInstance.isIdentified()) {
-            logger.warn("SDK is already identified, if you want to switch to another" +
-                    "user account, plz call TiktokBusinessSDK.logout() first and then identify");
+        try {
+            TTUserInfo sharedInstance = TTUserInfo.sharedInstance;
+            if (sharedInstance.isIdentified()) {
+                logger.warn("SDK is already identified, if you want to switch to another" +
+                        "user account, plz call TiktokBusinessSDK.logout() first and then identify");
+                return false;
+            }
+            sharedInstance.setIdentified();
+            if (!TextUtils.isEmpty(externalId)) {
+                sharedInstance.setExternalId(externalId);
+            }
+            if (!TextUtils.isEmpty(externalUserName)) {
+                sharedInstance.setExternalUserName(externalUserName);
+            }
+            if (!TextUtils.isEmpty(phoneNumber)) {
+                sharedInstance.setPhoneNumber(phoneNumber);
+            }
+            if (!TextUtils.isEmpty(email)) {
+                sharedInstance.setEmail(email);
+            }
+            trackEvent(TTAppEvent.TTAppEventType.identify, null, null, null, false);
+            flushWithReason(FlushReason.IDENTIFY);
+            return true;
+        } catch (Throwable ignore) {
             return false;
         }
-        sharedInstance.setIdentified();
-        if (!TextUtils.isEmpty(externalId)) {
-            sharedInstance.setExternalId(externalId);
-        }
-        if (!TextUtils.isEmpty(externalUserName)) {
-            sharedInstance.setExternalUserName(externalUserName);
-        }
-        if (!TextUtils.isEmpty(phoneNumber)) {
-            sharedInstance.setPhoneNumber(phoneNumber);
-        }
-        if (!TextUtils.isEmpty(email)) {
-            sharedInstance.setEmail(email);
-        }
-        trackEvent(TTAppEvent.TTAppEventType.identify, null, null, null, false);
-        flushWithReason(TTAppEventLogger.FlushReason.IDENTIFY);
-        return true;
     }
 
     public void logout() {
@@ -311,6 +320,7 @@ public class TTAppEventLogger {
     public void track(String event, @Nullable JSONObject props) {
         trackEvent(TTAppEvent.TTAppEventType.track, event, props, null, false);
     }
+
     public void track(String event, @Nullable JSONObject props, String eventId) {
         trackEvent(TTAppEvent.TTAppEventType.track, event, props, eventId, false);
     }
@@ -324,28 +334,27 @@ public class TTAppEventLogger {
             return;
         }
         try {
-            if ("enhanced_data_postback".equals(props.optString("monitor_type", ""))) {
+            final String mt = JSON.getString(props, "monitor_type", "");
+            if ("enhanced_data_postback".equals(mt)) {
                 TTEDPEventTrack.trackUnityEvent(event, props);
                 return;
             }
-        }catch (Throwable throwable){
-            throwable.printStackTrace();
+        } catch (Throwable ignore) {
         }
 
-        JSONObject finalProps = props != null ? props : new JSONObject();
-        if(TikTokBusinessSdk.isEnableDebugMode()){
+        final JSONObject finalProps = props != null ? props : JSON.build();
+        if (TikTokBusinessSdk.isEnableDebugMode()) {
             uiThreadHandler.post(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         if (edp) {
-                            finalProps.put("track_source", "edp");
+                            JSON.putObject(finalProps, "track_source", "edp");
                         }
                         TTAppEvent ttAppEvent = new TTAppEvent(type, event, finalProps.toString(), eventId, TikTokBusinessSdk.getTTAppIds());
                         ttAppEvent.setScreenShot();
                         addToTask(ttAppEvent, null, null, null, null, edp);
-                    }catch (Throwable e){
-
+                    } catch (Throwable ignore) {
                     }
                 }
             });
@@ -354,17 +363,17 @@ public class TTAppEventLogger {
         }
     }
 
-    private void addToTask(TTAppEvent appEvent,TTAppEvent.TTAppEventType type, String event, @Nullable JSONObject props, String eventId, boolean edp){
+    private void addToTask(TTAppEvent appEvent, TTAppEvent.TTAppEventType type, String event, @Nullable JSONObject props, String eventId, boolean edp) {
         Runnable task = () -> {
             try {
                 TTAppEvent ttAppEvent = appEvent;
                 if (ttAppEvent == null) {
-                    if(edp){
-                        props.put("track_source", "edp");
+                    if (edp) {
+                        JSON.putObject(props, "track_source", "edp");
                     }
-                    ttAppEvent = new TTAppEvent(type, event, props.toString(), eventId, TikTokBusinessSdk.getTTAppIds());
+                    ttAppEvent = new TTAppEvent(type, event, props == null ? "" : props.toString(), eventId, TikTokBusinessSdk.getTTAppIds());
                 }
-                 if (edp) {
+                if (edp) {
                     TTEdpAppEventsQueue.addEvent(ttAppEvent);
                 } else {
                     TTAppEventsQueue.addEvent(ttAppEvent);
@@ -374,8 +383,7 @@ public class TTAppEventLogger {
                     flush(FlushReason.THRESHOLD);
                 }
 
-            }catch (Throwable e){
-
+            } catch (Throwable ignore) {
             }
         };
         addToQ(task);
@@ -432,7 +440,7 @@ public class TTAppEventLogger {
                 TTRequest
                         .reportAppEvent(TTRequestBuilder.getBasePayloadWithTs(), TTEdpAppEventsQueue.exportAllEvents(), true);
 
-                if (!failedEvents.isEmpty()) { // flush failed, persist events
+                if (failedEvents != null && !failedEvents.isEmpty()) { // flush failed, persist events
                     logger.debug("Failed to send %d events, will save to disk", failedEvents.size());
                     TTAppEventStorage.persist(failedEvents);
                 }
@@ -444,20 +452,24 @@ public class TTAppEventLogger {
                 TTAppEventStorage.persist(null);
             }
         } catch (Throwable e) {
-            TTEdpAppEventsQueue.clearAll();
-            TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
+            try {
+                TTEdpAppEventsQueue.clearAll();
+                TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
+            } catch (Throwable ignore) {
+            }
         }
 
         if (flushSize != 0) {
             try {
                 long endTimeMS = System.currentTimeMillis();
-                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS)
-                        .put("latency", endTimeMS-initTimeMS)
-                        .put("type",reason.name())
-                        .put("interval", TIME_BUFFER)
-                        .put("size", flushSize);
+                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+                JSON.putLong(meta, "latency", endTimeMS - initTimeMS);
+                JSON.putObject(meta, "type", reason.name());
+                JSON.putInt(meta, "interval", TIME_BUFFER);
+                JSON.putInt(meta, "size", flushSize);
                 monitorMetric("flush", meta, null);
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
 
         addToQ(TTCrashHandler::initCrashReporter);
@@ -490,11 +502,11 @@ public class TTAppEventLogger {
         }
     }
 
-    private void onExecuteFailed(Runnable runnable, Throwable e){
+    private void onExecuteFailed(Runnable runnable, Throwable e) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             runnable.run();
         } else {
-            logger.error(e,"Runnable execute error");
+            logger.error(e, "Runnable execute error");
         }
     }
 
@@ -528,21 +540,29 @@ public class TTAppEventLogger {
      */
     public void fetchGlobalConfig(int delaySeconds) {
         addToLater(() -> {
+            boolean enableSDK = false;
             try {
                 logger.info("Fetching global config....");
 
                 JSONObject requestResult = TTRequest.getBusinessSDKConfig();
 
                 if (requestResult == null) {
-                    logger.info("Opt out of initGlobalConfig because global config is null, api returns error");
-                    return;
+                    logger.info("config is null, api returns error");
+
+                    //retry immediately and only once
+                    requestResult = TTRequest.getBusinessSDKConfig();
+                    if (requestResult == null) {
+                        logger.info("config is null, api returns error2");
+                        return;
+                    }
                 }
 
-                JSONObject businessSdkConfig = (JSONObject) requestResult.get("business_sdk_config");
-                Boolean enableSDK = businessSdkConfig.getBoolean("enable_sdk");
-                String availableVersion = businessSdkConfig.getString("available_version");
-                String trackEventDomain = businessSdkConfig.getString("domain");
-                boolean enableDebugMode = businessSdkConfig.optBoolean("enable_debug_mode", false);
+                JSONObject businessSdkConfig = JSON.getJsonObject(requestResult, "business_sdk_config");
+                enableSDK = JSON.getBoolean(businessSdkConfig, "enable_sdk", false);
+                String availableVersion = JSON.getString(businessSdkConfig, "available_version");
+                String trackEventDomain = JSON.getString(businessSdkConfig, "domain");
+
+                NetworkTimeout.updateConfig(businessSdkConfig);
 
                 TikTokBusinessSdk.setSdkGlobalSwitch(enableSDK);
                 logger.debug("enable_sdk=" + enableSDK);
@@ -551,29 +571,25 @@ public class TTAppEventLogger {
                     logger.info("Clear all events and stop timers because global switch is not turned on");
                     clearAllImmediately();
                 }
-                if(enableDebugMode){
-                    TikTokBusinessSdk.enableDebugMode();
-                }else {
-                    TikTokBusinessSdk.disableDebugMode();
-                }
+
                 TikTokBusinessSdk.setApiAvailableVersion(availableVersion);
                 TikTokBusinessSdk.setApiTrackDomain(trackEventDomain);
                 logger.debug("available_version=" + availableVersion);
                 TikTokBusinessSdk.setGlobalConfigFetched();
-                autoTrackRetentionEnable = businessSdkConfig.optBoolean("auto_track_Retention_enable");
-                autoTrackPaymentEnable = businessSdkConfig.optBoolean("auto_track_Payment_enable");
+                autoTrackRetentionEnable = JSON.getBoolean(businessSdkConfig, "auto_track_Retention_enable");
+                TTInAppPurchaseWrapper.updateConfig(businessSdkConfig);
                 TTUnityBridge.setConfigCallback(requestResult);
-                EDPConfig.optConfig(businessSdkConfig.optJSONObject(EDP_NATIVE_SDK_CONFIG));
-            } catch (JSONException e) {
-                e.printStackTrace();
-                logger.warn("Errors happened during initGlobalConfig because the structure of api result is not correct");
-            } catch (Exception e) {
-                logger.warn("Errors occurred during initGlobalConfig because of " + e.getMessage());
-                e.printStackTrace();
+                EDPConfig.optConfig(JSON.getJsonObject(businessSdkConfig, EDP_NATIVE_SDK_CONFIG));
+            } catch (Throwable e) {
+                logger.error(e, "Errors occurred during initGlobalConfig");
             } finally {
                 if (TikTokBusinessSdk.isSystemActivated() && !TikTokBusinessSdk.isActivatedLogicRun) {
                     TikTokBusinessSdk.isActivatedLogicRun = true;
                     activateSdk();
+                }
+
+                if (enableSDK && !DebugModeHelper.isSuccess()) {
+                    addToQ(DebugModeHelper::tryRequestConfig);
                 }
             }
         }, delaySeconds);
@@ -584,40 +600,56 @@ public class TTAppEventLogger {
                               @Nullable JSONObject extra) {
         if (!metricsEnabled) return;
         addToQ(() -> {
-            JSONObject stat = new JSONObject();
+            if (!metricsEnabled) return;
+            JSONObject stat;
             try {
                 stat = TTRequestBuilder.getHealthMonitorBase();
-            } catch (Exception ignored) {}
-            JSONObject monitor = new JSONObject();
-            try {
-                monitor.put("type", "metric");
-                monitor.put("name", name);
-                if (meta != null) {
-                    monitor.put("meta", meta);
-                }
-                if (extra != null) {
-                    monitor.put("extra", extra);
-                }
-                stat.put("monitor", monitor);
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {
+                stat = JSON.build();
+            }
+
+            JSONObject monitor = JSON.build();
+            JSON.putObject(monitor, "type", "metric");
+            JSON.putObject(monitor, "name", name);
+            if (meta != null) {
+                JSON.putObject(monitor, "meta", meta);
+            }
+            if (extra != null) {
+                JSON.putObject(monitor, "extra", extra);
+            }
+
+            JSON.putObject(stat, "monitor", monitor);
+
             TTCrashHandler.retryLater(stat);
         });
     }
 
     public void fetchDeferredDeeplinkWithCompletion(TikTokBusinessSdk.FetchDeferredDeeplinkCompletion callback) {
+        final DeeplinkCallbackWrapper wrapper = new DeeplinkCallbackWrapper(callback);
+        wrapper.markInit();
+
         addToQ(() -> {
+            wrapper.markThread();
+
+            String ddlData = "";
+            ErrorData errorData = null;
+
             try {
-                JSONObject ddlInfo = new JSONObject(TTRequest.fetchDeferredDeeplinkWithCompletion());
-                int code = ddlInfo.optInt("code");
-                String data = ddlInfo.optJSONObject("data").optString("ddl");
-                if (code == 0 && !TextUtils.isEmpty(data)) {
-                    callback.completion(data, null);
-                } else {
-                    callback.completion("", new ErrorData(code, ddlInfo.optString("message", "")));
+                HttpRequestUtil.HttpResponse response = TTRequest.fetchDeferredDeeplinkWithCompletion();
+                ddlData = JSON.getString(JSON.getJsonObject(response.body, "data"), "ddl");
+                wrapper.markRequest();
+
+                if (!response.isOK() || TextUtils.isEmpty(ddlData)) {
+                    ddlData = "";
+                    errorData = new ErrorData(response.getErrCode(), response.getErrMsg());
                 }
-            } catch (Throwable throwable) {
-                callback.completion("", new ErrorData(TT_DDL_CODE_HTTP_ERROR, TT_DDL_MSG_HTTP_ERROR ));
+            } catch (Throwable e) {
+                ddlData = "";
+                errorData = new ErrorData(TT_DDL_CODE_HTTP_ERROR, e.getMessage());
             }
+
+            wrapper.markEnd();
+            wrapper.completion(ddlData, errorData);
         });
     }
 

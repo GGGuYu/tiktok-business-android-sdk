@@ -13,8 +13,7 @@ public class TTUnityBridge {
             Class<?> classtype = Class.forName("com.unity3d.player.UnityPlayer");
             Method method = classtype.getMethod("UnitySendMessage", String.class, String.class, String.class);
             method.invoke(classtype, "TikTokInnerManager", "UpdateConfigFromNative", config.toString());
-        } catch (Throwable e) {
-
+        } catch (Throwable ignore) {
         }
     }
 }

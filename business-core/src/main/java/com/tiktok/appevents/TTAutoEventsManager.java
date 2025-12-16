@@ -6,28 +6,30 @@
 
 package com.tiktok.appevents;
 
+import static com.tiktok.appevents.TTAppEventLogger.autoTrackRetentionEnable;
+import static com.tiktok.util.TTConst.AutoEvents;
+import static com.tiktok.util.TTConst.TRACK_TYPE;
+import static com.tiktok.util.TTConst.TRACK_TYPE_AUTO;
+import static com.tiktok.util.TTConst.TTSDK_APP_2DR_TIME;
+import static com.tiktok.util.TTConst.TTSDK_APP_FIRST_INSTALL;
+import static com.tiktok.util.TTConst.TTSDK_APP_LAST_LAUNCH;
+
+import android.text.TextUtils;
+
 import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.util.JSON;
 import com.tiktok.util.TTConst;
 import com.tiktok.util.TTKeyValueStore;
 
-import java.text.ParseException;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 
-import static com.tiktok.appevents.TTAppEventLogger.autoTrackRetentionEnable;
-import static com.tiktok.util.TTConst.*;
-
-import android.text.TextUtils;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
 class TTAutoEventsManager {
-
-    private static final String TAG = TTAutoEventsManager.class.getCanonicalName();
 
     private static final SimpleDateFormat dateFormat;
     private static final SimpleDateFormat timeFormat;
@@ -63,26 +65,28 @@ class TTAutoEventsManager {
     }
 
     private void trackFirstInstallEvent() {
-        /* get install trigger time, set only on InstallApp trigger */
-        String installTime = store.get(TTSDK_APP_FIRST_INSTALL);
-        if (installTime != null) return;
+        try {
+            /* get install trigger time, set only on InstallApp trigger */
+            String installTime = store.get(TTSDK_APP_FIRST_INSTALL);
+            if (installTime != null) return;
 
-        Date now = new Date();
-        HashMap<String, Object> hm = new HashMap<>();
-        hm.put(TTSDK_APP_FIRST_INSTALL, timeFormat.format(now));
+            Date now = new Date();
+            HashMap<String, Object> hm = new HashMap<>();
+            hm.put(TTSDK_APP_FIRST_INSTALL, timeFormat.format(now));
 
-        /* check and track InstallApp. */
-        if (shouldTrackAppLifecycleEvents(AutoEvents.InstallApp)) {
-            try {
-                JSONObject props = new JSONObject();
-                props.putOpt(TRACK_TYPE, TRACK_TYPE_AUTO);
-                appEventLogger.track(AutoEvents.InstallApp.name, props);
-            } catch (JSONException e) {
-                e.printStackTrace();
+            /* check and track InstallApp. */
+            if (shouldTrackAppLifecycleEvents(AutoEvents.InstallApp)) {
+                try {
+                    JSONObject props = JSON.build();
+                    JSON.putObject(props, TRACK_TYPE, TRACK_TYPE_AUTO);
+                    appEventLogger.track(AutoEvents.InstallApp.name, props);
+                } catch (Throwable ignore) {
+                }
             }
-        }
 
-        store.set(hm);
+            store.set(hm);
+        } catch (Throwable ignore) {
+        }
     }
 
     /**
@@ -98,7 +102,7 @@ class TTAutoEventsManager {
         String firstInstall = store.get(TTSDK_APP_FIRST_INSTALL);
         if (TextUtils.isEmpty(firstInstall)) {
             return;// should not happen
-         }
+        }
 
         try {
             Date firstLaunchTime = timeFormat.parse(firstInstall);
@@ -107,28 +111,34 @@ class TTAutoEventsManager {
                     && isSatisfyRetention(firstLaunchTime, now)
                     && autoTrackRetentionEnable) {
                 try {
-                    JSONObject props = new JSONObject();
-                    props.putOpt(TRACK_TYPE, TRACK_TYPE_AUTO);
+                    JSONObject props = JSON.build();
+                    JSON.putObject(props, TRACK_TYPE, TRACK_TYPE_AUTO);
                     appEventLogger.track(AutoEvents.SecondDayRetention.name, props);
-                } catch (JSONException e) {
-                    e.printStackTrace();
+                } catch (Throwable ignore) {
                 }
-                store.set(TTSDK_APP_2DR_TIME, timeFormat.format(now));
+
+                try {
+                    store.set(TTSDK_APP_2DR_TIME, timeFormat.format(now));
+                } catch (Throwable ignored) {
+                }
             }
-        } catch (ParseException ignored) {
+        } catch (Throwable ignored) {
         }
     }
 
     private void trackLaunchEvent() {
         if (shouldTrackAppLifecycleEvents(AutoEvents.LaunchAPP)) {
             try {
-                JSONObject props = new JSONObject();
-                props.putOpt(TRACK_TYPE, TRACK_TYPE_AUTO);
+                JSONObject props = JSON.build();
+                JSON.putObject(props, TRACK_TYPE, TRACK_TYPE_AUTO);
                 appEventLogger.track(AutoEvents.LaunchAPP.name, props);
-            } catch (JSONException e) {
-                e.printStackTrace();
+            } catch (Throwable ignore) {
             }
-            store.set(TTSDK_APP_LAST_LAUNCH, timeFormat.format(new Date()));
+
+            try {
+                store.set(TTSDK_APP_LAST_LAUNCH, timeFormat.format(new Date()));
+            } catch (Throwable ignored) {
+            }
         }
     }
 

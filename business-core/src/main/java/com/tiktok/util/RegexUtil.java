@@ -3,22 +3,31 @@ package com.tiktok.util;
 import static com.tiktok.appevents.TTUserInfo.toSha256;
 
 import android.text.TextUtils;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class RegexUtil {
     public static boolean validateAppId(String appId) {
-        String appIdRegex = "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$";
-        Pattern pattern = Pattern.compile(appIdRegex);
-        Matcher matcher = pattern.matcher(appId);
-        return matcher.matches();
+        try {
+            String appIdRegex = "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$";
+            Pattern pattern = Pattern.compile(appIdRegex);
+            Matcher matcher = pattern.matcher(appId);
+            return matcher.matches();
+        } catch (Throwable ignore) {
+        }
+        return false;
     }
 
     public static boolean validateTTAppId(String ttAppId) {
-        String ttAppIdRegex = "^(\\d+,)*\\d+$";
-        Pattern pattern = Pattern.compile(ttAppIdRegex);
-        Matcher matcher = pattern.matcher(ttAppId);
-        return matcher.matches();
+        try {
+            String ttAppIdRegex = "^(\\d+,)*\\d+$";
+            Pattern pattern = Pattern.compile(ttAppIdRegex);
+            Matcher matcher = pattern.matcher(ttAppId);
+            return matcher.matches();
+        } catch (Throwable ignore) {
+        }
+        return false;
     }
 
     public static String replaceAllToHash(String regex, String origin) {
@@ -35,7 +44,7 @@ public class RegexUtil {
             }
             matcher.appendTail(stringBuffer);
             return stringBuffer.toString();
-        } catch (Throwable throwable) {
+        } catch (Throwable ignore) {
             return "";
         }
     }

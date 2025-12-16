@@ -6,37 +6,34 @@
 
 package com.tiktok.util;
 
-import android.content.Context;
-import android.net.Uri;
-import android.os.Looper;
-import android.text.TextUtils;
-
-import androidx.annotation.Nullable;
-import com.tiktok.TikTokBusinessSdk;
-import com.tiktok.appevents.TTCrashHandler;
-import com.tiktok.appevents.edp.Sensig;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.Arrays;
-import java.util.Map;
-import java.util.UUID;
-
 import static com.tiktok.util.TTConst.TTSDK_APP_ANONYMOUS_ID;
 import static com.tiktok.util.TTConst.TTSDK_APP_SENSIG_LIST;
 import static com.tiktok.util.TTConst.TTSDK_APP_SENSIG_VERSION;
 import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
+import android.content.Context;
+import android.os.Looper;
+import android.text.TextUtils;
+
+import androidx.annotation.Nullable;
+
+import com.tiktok.TikTokBusinessSdk;
+import com.tiktok.appevents.TTCrashHandler;
+import com.tiktok.appevents.edp.Sensig;
+
+import org.json.JSONObject;
+
+import java.util.Arrays;
+import java.util.UUID;
+
 public class TTUtil {
-    private static final String TAG = TTUtil.class.getName();
-    private static final TTLogger logger = new TTLogger(TAG, TikTokBusinessSdk.getLogLevel());
+    private static final TTLogger logger = new TTLogger("TTUtil", TikTokBusinessSdk.getLogLevel());
 
     /**
      * All internal operations should be pushed to the internal {@link com.tiktok.appevents.TTAppEventLogger#eventLoop}
      * and run in a non-main thread
      *
-     * @param tag
+     * @param tag tag name
      */
     public static void checkThread(String tag) {
         if (Looper.getMainLooper() == Looper.myLooper()) {
@@ -44,80 +41,64 @@ public class TTUtil {
         }
     }
 
-    /**
-     * pretty print str
-     *
-     * @param o
-     * @return
-     */
-    public static String ppStr(JSONObject o) {
-        if (o == null) {
-            return "null";
-        }
-        try {
-            return o.toString(4);
-        } catch (JSONException e) {
-            return "";
-        }
-    }
-
-    public static String ppStr(String str) {
-        try {
-            return ppStr(new JSONObject(str));
-        } catch (JSONException e) {
-            return "";
-        }
-    }
-
     public static String getOrGenAnoId(Context context, boolean forceGenerate) {
-        TTKeyValueStore store = new TTKeyValueStore(context);
-        String anoId = store.get(TTSDK_APP_ANONYMOUS_ID);
-        if (TextUtils.isEmpty(anoId) || forceGenerate) {
-            // TODO make sure anoId universally unique, also limit the length.
-            anoId = UUID.randomUUID().toString();
-            store.set(TTSDK_APP_ANONYMOUS_ID, anoId);
-            logger.info("AnonymousId reset to " + anoId);
+        try {
+            TTKeyValueStore store = new TTKeyValueStore(context);
+            String anoId = store.get(TTSDK_APP_ANONYMOUS_ID);
+            if (TextUtils.isEmpty(anoId) || forceGenerate) {
+                anoId = UUID.randomUUID().toString();
+                store.set(TTSDK_APP_ANONYMOUS_ID, anoId);
+                logger.info("AnonymousId reset to " + anoId);
+            }
+            return anoId;
+        } catch (Throwable ignore) {
         }
-        return anoId;
+        return "";
     }
 
     public static Sensig getSensigInfo(Context context) {
-        TTKeyValueStore store = new TTKeyValueStore(context);
-        int version = store.getInt(TTSDK_APP_SENSIG_VERSION);
-        String sensigList = store.get(TTSDK_APP_SENSIG_LIST);
-        if(TextUtils.isEmpty(sensigList)){
-            return null;
+        try {
+            TTKeyValueStore store = new TTKeyValueStore(context);
+            int version = store.getInt(TTSDK_APP_SENSIG_VERSION);
+            String sensigList = store.get(TTSDK_APP_SENSIG_LIST);
+            return new Sensig(version, sensigList);
+        } catch (Throwable ignore) {
         }
-        return new Sensig(version, sensigList);
+
+        return null;
     }
 
     public static void setSensigInfo(Context context, Sensig sensig) {
-        if(sensig == null){
+        if (sensig == null) {
             return;
         }
-        TTKeyValueStore store = new TTKeyValueStore(context);
-        store.set(TTSDK_APP_SENSIG_VERSION, sensig.version);
-        store.set(TTSDK_APP_SENSIG_LIST, sensig.regexList);
+        try {
+            TTKeyValueStore store = new TTKeyValueStore(context);
+            store.set(TTSDK_APP_SENSIG_VERSION, sensig.version);
+            store.set(TTSDK_APP_SENSIG_LIST, sensig.regexList);
+        } catch (Throwable ignore) {
+        }
     }
 
     public static JSONObject getMetaWithTS(@Nullable Long ts) {
         if (ts == null) {
             ts = System.currentTimeMillis();
         }
-        try {
-            return new JSONObject().put("ts", ts);
-        } catch (Exception ignored) {}
-        return new JSONObject();
+
+        final JSONObject json = JSON.build();
+        JSON.putLong(json, "ts", ts);
+        return json;
     }
 
     public static JSONObject getMonitorException(@Nullable Throwable ex, @Nullable Long ts, int type) {
-        JSONObject monitor = new JSONObject();
+        JSONObject monitor = JSON.build();
         try {
-            monitor.put("type", "exception");
-            monitor.put("name", "exception");
-            monitor.put("meta", getMetaException(ex, ts, type));
-            monitor.put("extra", null);
-        } catch (Exception ignored) {}
+            JSON.putObject(monitor, "type", "exception");
+            JSON.putObject(monitor, "name", "exception");
+            JSON.putObject(monitor, "meta", getMetaException(ex, ts, type));
+            JSON.putObject(monitor, "extra", null);
+        } catch (Throwable ignored) {
+        }
         return monitor;
     }
 
@@ -126,27 +107,28 @@ public class TTUtil {
         try {
             if (ex != null) {
                 Throwable rootCause = ex;
-                while(rootCause.getCause() != null && rootCause.getCause() != rootCause)
+                while (rootCause.getCause() != null && rootCause.getCause() != rootCause)
                     rootCause = rootCause.getCause();
-                meta.put("ex_class", rootCause.getStackTrace()[0].getClassName());
-                meta.put("ex_method", rootCause.getStackTrace()[0].getMethodName());
+                JSON.putObject(meta, "ex_class", rootCause.getStackTrace()[0].getClassName());
+                JSON.putObject(meta, "ex_method", rootCause.getStackTrace()[0].getMethodName());
                 String argMsg = rootCause.getStackTrace()[0].getFileName() +
                         " " + rootCause.getStackTrace()[0].getLineNumber();
-                meta.put("ex_args", argMsg);
-                meta.put("ex_msg", rootCause.getMessage());
-                meta.put("ex_type", type);
+                JSON.putObject(meta, "ex_args", argMsg);
+                JSON.putObject(meta, "ex_msg", rootCause.getMessage());
+                JSON.putInt(meta, "ex_type", type);
                 final int stackLimit = 15;
                 String[] st = new String[stackLimit];
-                for(int i = 0; i < stackLimit; i++) {
+                for (int i = 0; i < stackLimit; i++) {
                     if (rootCause.getStackTrace()[i] != null)
                         st[i] = rootCause.getStackTrace()[i].toString();
                 }
-                meta.put("ex_stack", Arrays.toString(st));
-                meta.put("success", false);
+                JSON.putObject(meta, "ex_stack", Arrays.toString(st));
+                JSON.putBoolean(meta, "success", false);
             } else {
-                meta.put("success", true);
+                JSON.putBoolean(meta, "success", true);
             }
-        } catch (Exception ignored) {}
+        } catch (Throwable ignored) {
+        }
         return meta;
     }
 }

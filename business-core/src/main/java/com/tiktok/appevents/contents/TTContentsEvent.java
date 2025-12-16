@@ -16,9 +16,9 @@ import static com.tiktok.appevents.contents.TTContentsEventConstants.Params.EVEN
 import android.text.TextUtils;
 
 import com.tiktok.appevents.base.TTBaseEvent;
+import com.tiktok.util.JSON;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 public class TTContentsEvent extends TTBaseEvent {
@@ -26,21 +26,21 @@ public class TTContentsEvent extends TTBaseEvent {
         super(eventName, properties, eventId);
     }
 
-    public static class Builder extends TTBaseEvent.Builder{
+    public static class Builder extends TTBaseEvent.Builder {
 
         Builder(String eventName, String eventId) {
             super(eventName, eventId);
         }
 
         public Builder setDescription(String description) {
-            if(!TextUtils.isEmpty(description)){
+            if (!TextUtils.isEmpty(description)) {
                 addProperty(EVENT_PROPERTY_DESCRIPTION, description);
             }
             return this;
         }
 
         public Builder setCurrency(TTContentsEventConstants.Currency currency) {
-            if(currency != null) {
+            if (currency != null) {
                 addProperty(EVENT_PROPERTY_CURRENCY, currency);
             }
             return this;
@@ -52,14 +52,14 @@ public class TTContentsEvent extends TTBaseEvent {
         }
 
         public Builder setContentType(String contentType) {
-            if(!TextUtils.isEmpty(contentType)) {
+            if (!TextUtils.isEmpty(contentType)) {
                 addProperty(EVENT_PROPERTY_CONTENT_TYPE, contentType);
             }
             return this;
         }
 
         public Builder setContentId(String contentId) {
-            if(!TextUtils.isEmpty(contentId)) {
+            if (!TextUtils.isEmpty(contentId)) {
                 addProperty(EVENT_PROPERTY_CONTENT_ID, contentId);
             }
             return this;
@@ -67,10 +67,10 @@ public class TTContentsEvent extends TTBaseEvent {
 
         public Builder setContents(TTContentParams... contents) {
             if (contents != null) {
-                JSONArray jsonArray = new JSONArray();
+                JSONArray jsonArray = JSON.buildArr();
                 for (TTContentParams content : contents) {
-                    if(content != null) {
-                        jsonArray.put(content.toJSONObject());
+                    if (content != null) {
+                        JSON.putArr(jsonArray, content.toJSONObject());
                     }
                 }
                 addProperty(EVENT_PROPERTY_CONTENTS, jsonArray);
@@ -80,8 +80,9 @@ public class TTContentsEvent extends TTBaseEvent {
 
         private void safeAddProperty(String key, Object value) {
             try {
-                properties.put(key, value);
-            } catch (Throwable e) {}
+                JSON.putObject(properties, key, value);
+            } catch (Throwable ignore) {
+            }
         }
 
         public TTContentsEvent build() {
