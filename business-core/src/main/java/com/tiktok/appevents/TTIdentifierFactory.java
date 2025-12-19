@@ -93,6 +93,8 @@ public class TTIdentifierFactory {
                 JSONObject meta = TTUtil.getMetaWithTS(null);
                 JSON.putLong(meta, "duration", info.duration);
                 JSON.putInt(meta, "from", info.from);
+                JSON.putInt(meta, "result", TextUtils.isEmpty(info.getAdId()) ? 0 : 1);
+                JSON.putInt(meta, "lat", info.isAdTrackingEnabled() ? 1 : 0);
                 TikTokBusinessSdk.getAppEventLogger().monitorMetric("gaid_result", meta, null);
             }
         } catch (Throwable ignore) {

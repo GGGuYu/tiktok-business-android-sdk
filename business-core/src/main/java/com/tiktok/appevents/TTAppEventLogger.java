@@ -169,6 +169,10 @@ public class TTAppEventLogger {
                 if (callback != null) {
                     callback.success();
                 }
+
+                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+                JSON.putLong(meta, "duration", (System.currentTimeMillis() - initTimeMS));
+                monitorMetric("init_end_callback", TTUtil.getMetaWithTS(initTimeMS), null);
             } catch (Throwable e) {
                 logger.error(e, "init error");
             }
