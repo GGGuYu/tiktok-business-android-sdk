@@ -122,7 +122,9 @@ public class TTHierarchyHelper {
                                     return false;
                                 }
                                 TTEDPEventTrack.isSending = true;
-                                String className = v.getClass().getCanonicalName();
+                                final String className = v.getClass().getCanonicalName();
+                                final float rawX = event.getRawX();
+                                final float rawY = event.getRawY();
                                 TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
                                     @Override
                                     public void run() {
@@ -139,7 +141,7 @@ public class TTHierarchyHelper {
 
                                             View decorView = act.getWindow().getDecorView();
 
-                                            TTEDPEventTrack.trackClick(className, event.getRawX(), event.getRawY(), view.getMeasuredWidth(),
+                                            TTEDPEventTrack.trackClick(className, rawX, rawY, view.getMeasuredWidth(),
                                                     view.getMeasuredHeight(), view instanceof TextView ? ((TextView) (view)).getText().toString() : "",
                                                     act.getClass().getSimpleName(), TTHierarchyHelper.getViewHierarchy(new WeakReference<>(decorView), EDPConfig.page_detail_upload_deep_count),
                                                     getViewHierarchyCount(new WeakReference<>(decorView)),

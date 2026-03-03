@@ -13,9 +13,11 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.os.IBinder;
 import android.os.IInterface;
+import android.os.Looper;
 import android.os.Parcel;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.IOUtils;
@@ -47,6 +49,7 @@ public class TTIdentifierFactory {
     private static volatile long sNextUpdateTime = SystemClock.elapsedRealtime() + UPDATE_TIMES;
 
     public static AdIdInfo getGoogleAdIdInfo(Context context) {
+        Log.e("TAG", "isMain===" + (Thread.currentThread() == Looper.getMainLooper().getThread()));
         if (sMaxRetry.get() > 20) {
             return AdIdInfo.buildDefault();
         }
