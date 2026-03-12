@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 
 import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.util.JSON;
+import com.tiktok.util.LastSessionUtil;
 import com.tiktok.util.SystemInfoUtil;
 import com.tiktok.util.TTUtil;
 import com.tiktok.util.TimeUtil;
@@ -187,6 +188,8 @@ class TTRequestBuilder {
             JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
             JSON.putObject(app, "app_session_id", SystemInfoUtil.getAppSessionId());
             JSON.putObject(app, "anonymous_id", TTUserInfo.sharedInstance.anonymousId);
+
+            LastSessionUtil.inject2RequestParam(app);
         } catch (Throwable ignore) {
         }
 
