@@ -10,13 +10,13 @@ import static com.tiktok.util.TTConst.TTSDK_EXCEPTION_SDK_CATCH;
 
 import android.content.Context;
 
+import com.tiktok.util.DecryptUtil;
 import com.tiktok.util.JSON;
 import com.tiktok.util.TTUtil;
 
 import org.json.JSONObject;
 
 import java.io.Serializable;
-import java.security.MessageDigest;
 
 public class TTUserInfo implements Cloneable, Serializable {
     static final String TAG = "TTUserInfo";
@@ -39,24 +39,6 @@ public class TTUserInfo implements Cloneable, Serializable {
         sharedInstance.isIdentified = false;
     }
 
-    public static String toSha256(String str) {
-        if (str == null) {
-            return null;
-        }
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            md.update(str.getBytes());
-            StringBuilder result = new StringBuilder();
-            for (byte b : md.digest()) {
-                result.append(Integer.toString((b & 0xff) + 0x100, 16).substring(1));
-            }
-            return result.toString();
-        } catch (Throwable e) {
-            TTCrashHandler.handleCrash(TAG, e, TTSDK_EXCEPTION_SDK_CATCH);
-        }
-        return null;
-    }
-
     public boolean isIdentified() {
         return this.isIdentified;
     }
@@ -66,19 +48,35 @@ public class TTUserInfo implements Cloneable, Serializable {
     }
 
     public void setExternalId(String externalId) {
-        this.externalId = toSha256(externalId);
+        if (DecryptUtil.isSHA256(externalId)) {
+            this.externalId = externalId;
+        } else {
+            this.externalId = DecryptUtil.toSha256(externalId);
+        }
     }
 
     public void setExternalUserName(String externalUserName) {
-        this.externalUserName = toSha256(externalUserName);
+        if (DecryptUtil.isSHA256(externalUserName)) {
+            this.externalUserName = externalUserName;
+        } else {
+            this.externalUserName = DecryptUtil.toSha256(externalUserName);
+        }
     }
 
     public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = toSha256(phoneNumber);
+        if (DecryptUtil.isSHA256(phoneNumber)) {
+            this.phoneNumber = phoneNumber;
+        } else {
+            this.phoneNumber = DecryptUtil.toSha256(phoneNumber);
+        }
     }
 
     public void setEmail(String email) {
-        this.email = toSha256(email);
+        if (DecryptUtil.isSHA256(email)) {
+            this.email = email;
+        } else {
+            this.email = DecryptUtil.toSha256(email);
+        }
     }
 
     public JSONObject toJsonObject() {
