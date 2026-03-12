@@ -7,6 +7,7 @@ package com.tiktok.appevents.edp;
 
 import android.app.Activity;
 import android.app.Application;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -124,21 +125,35 @@ public class TTActivityLifecycleCallbacks implements Application.ActivityLifecyc
 
         TTInAppPurchaseWrapper.tryReportIapEvent(activity);
 
-        if (EDPConfig.enable_sdk && EDPConfig.enable_app_launch_track && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 && mIsBackground && activity.getReferrer() != null) {
+        if (EDPConfig.enable_sdk && EDPConfig.enable_app_launch_track && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1 && mIsBackground) {
             try {
-                TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (EDPConfig.enable_sdk && EDPConfig.enable_app_launch_track) {
-                            try {
-                                TTEDPEventTrack.trackAppLaunch(activityWeakReference.get().getReferrer().toString(),
-                                        activityWeakReference.get().getIntent() != null && activityWeakReference.get().getIntent().getData() != null
-                                                ? activityWeakReference.get().getIntent().getData().toString() : "");
-                            } catch (Throwable ignore) {
+                final Uri refer = activity.getReferrer();
+                if (refer != null) {
+                    TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (EDPConfig.enable_sdk && EDPConfig.enable_app_launch_track) {
+                                try {
+                                    String data = "";
+                                    if (activityWeakReference != null) {
+                                        try {
+                                            final Activity act = activityWeakReference.get();
+                                            if (act != null) {
+                                                data = act.getIntent().getData().toString();
+                                            }
+                                        } catch (Throwable ignore) {
+                                        }
+                                    }
+
+                                    if (refer != null) {
+                                        TTEDPEventTrack.trackAppLaunch(refer.toString(), data);
+                                    }
+                                } catch (Throwable ignore) {
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
             } catch (Throwable ignore) {
             }
         }
