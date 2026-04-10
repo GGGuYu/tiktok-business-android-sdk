@@ -36,7 +36,6 @@ class TTRequestBuilder {
     }
 
     public static JSONObject getBasePayload() {
-        TTUtil.checkThread(TAG);
         boolean isDebugMode = TikTokBusinessSdk.isInSdkDebugMode() || TikTokBusinessSdk.isEnableDebugMode();
 
         try {
