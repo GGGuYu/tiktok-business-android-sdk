@@ -36,18 +36,18 @@ public class EDPConfig {
     }
 
     public static final String DEFAULT_SENSIG_FILTERING_REGEX_LIST = "([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9._-]+)|(\\+?0?86-?)?1[3-9]\\d{9}|(\\+\\d{1,2}\\s?)?\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}";
-    public static boolean enable_sdk = false;
-    public static boolean enable_app_launch_track = false;
-    public static boolean enable_page_show_track = false;
-    public static boolean enable_click_track = false;
-    public static boolean enable_webview_request_track = false;
-    public static boolean enable_pay_show_track = false;
-    public static int page_detail_upload_deep_count = 12;
-    public static double time_diff_frequency_control = 0;
-    public static double report_frequency_control = 1;
-    public static Set<String> button_black_list = new HashSet<>();
-    public static String sensig_filtering_regex_list = DEFAULT_SENSIG_FILTERING_REGEX_LIST;
-    public static int sensig_filtering_regex_version = 0;
+    public static volatile boolean enable_sdk = false;
+    public static volatile boolean enable_app_launch_track = false;
+    public static volatile boolean enable_page_show_track = false;
+    public static volatile boolean enable_click_track = false;
+    public static volatile boolean enable_webview_request_track = false;
+    public static volatile boolean enable_pay_show_track = false;
+    public static volatile int page_detail_upload_deep_count = 12;
+    public static volatile double time_diff_frequency_control = 0;
+    public static volatile double report_frequency_control = 1;
+    public static volatile Set<String> button_black_list = new HashSet<>();
+    public static volatile String sensig_filtering_regex_list = DEFAULT_SENSIG_FILTERING_REGEX_LIST;
+    public static volatile int sensig_filtering_regex_version = 0;
 
     public static void optConfig(JSONObject config) {
         if (config == null) {

@@ -39,8 +39,8 @@ import java.util.Random;
 
 public class TTEDPEventTrack {
     private static TTAppLaunchEvent ttAppLaunchEvent;
-    public static long LAST_CLICK_TS = 0L;
-    private static boolean hasSendLaunch = false;
+    public static volatile long LAST_CLICK_TS = 0L;
+    private static volatile boolean hasSendLaunch = false;
     public static volatile boolean isSending = false;
     public static volatile boolean pageShowIsSending = false;
 
