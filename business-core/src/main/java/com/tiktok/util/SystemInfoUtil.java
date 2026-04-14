@@ -51,7 +51,7 @@ public class SystemInfoUtil {
     private static int sVerCode = 0;
 
 
-    private static String sAppSessionId = "";
+    private static volatile String sAppSessionId = "";
     private static ReferrerInfo sReferrerInfo = null;
 
     private static void initInfo() {
@@ -190,7 +190,12 @@ public class SystemInfoUtil {
 
     public static void initAppSessionId() {
         try {
-            sAppSessionId = UUID.randomUUID().toString();
+            if (TextUtils.isEmpty(sAppSessionId)) {
+                sAppSessionId = UUID.randomUUID().toString();
+
+                //update for local cache
+                LastSessionUtil.setLast(sAppSessionId);
+            }
         } catch (Throwable ignore) {
         }
     }

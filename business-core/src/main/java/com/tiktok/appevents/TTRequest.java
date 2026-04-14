@@ -17,6 +17,7 @@ import com.tiktok.TikTokBusinessSdk;
 import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.util.HttpRequestUtil;
 import com.tiktok.util.JSON;
+import com.tiktok.util.LastSessionUtil;
 import com.tiktok.util.SystemInfoUtil;
 import com.tiktok.util.TTConst;
 import com.tiktok.util.TTLogger;
@@ -126,11 +127,7 @@ class TTRequest {
     public static JSONObject buildConfigParams() {
         JSONObject jsonObject = JSON.build();
         try {
-            JSONObject app = JSON.build();
-            JSON.putObject(app, "id", TikTokBusinessSdk.getAppId());
-            JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
-            JSON.putObject(app, "version", SystemInfoUtil.getAppVersionName());
-
+            JSONObject app = getAppInfo();
             JSON.putObject(jsonObject, "app", app);
 
             JSONObject device = JSON.build();
@@ -371,4 +368,24 @@ class TTRequest {
         String url = UrlConst.getDDLUrl();
         return HttpRequestUtil.doPost(url, headParamMap, stat.toString(), false);
     }
+
+    public static JSONObject getAppInfo() {
+        JSONObject app = JSON.build();
+        try {
+            if (TikTokBusinessSdk.bothIdsProvided()) {
+                JSON.putObject(app, "id", TikTokBusinessSdk.getAppId());
+            }
+            JSON.putObject(app, "name", SystemInfoUtil.getAppName());
+            JSON.putObject(app, "namespace", SystemInfoUtil.getPackageName());
+            JSON.putObject(app, "version", SystemInfoUtil.getAppVersionName());
+            JSON.putObject(app, "build", SystemInfoUtil.getAppVersionCode() + "");
+            JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
+            JSON.putObject(app, "app_session_id", SystemInfoUtil.getAppSessionId());
+
+            LastSessionUtil.inject2RequestParam(app);
+        } catch (Throwable ignore) {
+        }
+        return app;
+    }
+
 }

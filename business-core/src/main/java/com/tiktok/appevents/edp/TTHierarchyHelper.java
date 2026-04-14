@@ -37,6 +37,9 @@ public class TTHierarchyHelper {
             }
 
             View view = rootView.get();
+            if (view == null) {
+                return jsonObject;
+            }
 
             JSON.putObject(jsonObject, "class_name", view.getClass().getCanonicalName());
             if (view instanceof TextView) {
@@ -94,16 +97,20 @@ public class TTHierarchyHelper {
 
                 @Override
                 public boolean onTouch(View v, MotionEvent event) {
-                    if (!EDPConfig.enable_click_track) {
-                        return false;
-                    }
-                    if (act == null || act.isFinishing() || act.isDestroyed()) {
-                        return false;
-                    }
-                    if (view == null) {
-                        return false;
-                    }
                     try {
+                        if (!EDPConfig.enable_click_track) {
+                            return false;
+                        }
+                        if (act == null || act.isFinishing() || act.isDestroyed()) {
+                            return false;
+                        }
+                        if (view == null) {
+                            return false;
+                        }
+                        if (v == null) {
+                            return false;
+                        }
+
                         switch (event.getAction()) {
                             case MotionEvent.ACTION_DOWN:
                                 touchDown = System.currentTimeMillis();
@@ -112,7 +119,7 @@ public class TTHierarchyHelper {
                                 if (act == null || act.isFinishing() || act.isDestroyed()) {
                                     return false;
                                 }
-                                if (EDPConfig.button_black_list.contains(view.getClass().getCanonicalName())) {
+                                if (EDPConfig.button_black_list.contains(v.getClass().getCanonicalName())) {
                                     return false;
                                 }
                                 if (!TTEDPEventTrack.checkUpload() || TTEDPEventTrack.isSending) {
@@ -122,9 +129,19 @@ public class TTHierarchyHelper {
                                     return false;
                                 }
                                 TTEDPEventTrack.isSending = true;
-                                String className = v.getClass().getCanonicalName();
-                                float rawX = event.getRawX();
-                                float rawY = event.getRawY();
+                                final String className = v.getClass().getCanonicalName();
+                                final float rawX = event.getRawX();
+                                final float rawY = event.getRawY();
+                                final View decorView = act.getWindow().getDecorView();
+                                final int width = v.getMeasuredWidth();
+                                final int height = v.getMeasuredHeight();
+                                String tip = "";
+                                try {
+                                    tip = v instanceof TextView ? ((TextView) (v)).getText().toString() : "";
+                                } catch (Throwable ignore) {
+                                }
+                                final String tipFinal = tip;
+
                                 TikTokBusinessSdk.getAppEventLogger().addToQ(new Runnable() {
                                     @Override
                                     public void run() {
@@ -135,14 +152,11 @@ public class TTHierarchyHelper {
                                             if (act == null || act.isFinishing() || act.isDestroyed()) {
                                                 return;
                                             }
-                                            if (view == null) {
+                                            if (view == null || v == null) {
                                                 return;
                                             }
 
-                                            View decorView = act.getWindow().getDecorView();
-
-                                            TTEDPEventTrack.trackClick(className, rawX, rawY, view.getMeasuredWidth(),
-                                                    view.getMeasuredHeight(), view instanceof TextView ? ((TextView) (view)).getText().toString() : "",
+                                            TTEDPEventTrack.trackClick(className, rawX, rawY, width, height, tipFinal,
                                                     act.getClass().getSimpleName(), TTHierarchyHelper.getViewHierarchy(new WeakReference<>(decorView), EDPConfig.page_detail_upload_deep_count),
                                                     getViewHierarchyCount(new WeakReference<>(decorView)),
                                                     System.currentTimeMillis() - touchDown);
