@@ -1,7 +1,5 @@
 package com.tiktok.util;
 
-import static com.tiktok.appevents.TTUserInfo.toSha256;
-
 import android.text.TextUtils;
 
 import java.util.regex.Matcher;
@@ -39,7 +37,7 @@ public class RegexUtil {
             Pattern pattern = Pattern.compile(regex);
             Matcher matcher = pattern.matcher(origin);
             while (matcher.find()) {
-                String sha256 = toSha256(matcher.group());
+                String sha256 = DecryptUtil.toSha256(matcher.group());
                 matcher.appendReplacement(stringBuffer, sha256);
             }
             matcher.appendTail(stringBuffer);

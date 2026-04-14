@@ -27,6 +27,7 @@ import com.tiktok.iap.TTInAppPurchaseWrapper;
 import com.tiktok.unity.TTUnityBridge;
 import com.tiktok.util.HttpRequestUtil;
 import com.tiktok.util.JSON;
+import com.tiktok.util.LastSessionUtil;
 import com.tiktok.util.NetworkTimeout;
 import com.tiktok.util.SystemInfoUtil;
 import com.tiktok.util.TTConst;
@@ -157,6 +158,7 @@ public class TTAppEventLogger {
             try {
                 startHeart();
 
+                LastSessionUtil.getLastSessionID();
                 SystemInfoUtil.initAppSessionId();
                 SystemInfoUtil.initInstallReferrer();
                 SystemInfoUtil.updateSensigInfo();
@@ -169,6 +171,10 @@ public class TTAppEventLogger {
                 if (callback != null) {
                     callback.success();
                 }
+
+                JSONObject meta = TTUtil.getMetaWithTS(initTimeMS);
+                JSON.putLong(meta, "duration", (System.currentTimeMillis() - initTimeMS));
+                monitorMetric("init_end_callback", TTUtil.getMetaWithTS(initTimeMS), null);
             } catch (Throwable e) {
                 logger.error(e, "init error");
             }

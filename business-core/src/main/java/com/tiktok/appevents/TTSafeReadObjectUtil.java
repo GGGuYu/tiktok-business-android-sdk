@@ -15,6 +15,7 @@ import java.io.ObjectStreamClass;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class TTSafeReadObjectUtil {
     /**
@@ -42,6 +43,8 @@ public class TTSafeReadObjectUtil {
         safeClasses.add(Long.class);
         safeClasses.add(Integer.class);
         safeClasses.add(ArrayList.class);
+        safeClasses.add(CopyOnWriteArrayList.class);
+        safeClasses.add(List.class);
         return safeReadObjects(safeClasses, Long.MAX_VALUE, Long.MAX_VALUE, in);
     }
 

@@ -36,7 +36,6 @@ class TTRequestBuilder {
     }
 
     public static JSONObject getBasePayload() {
-        TTUtil.checkThread(TAG);
         boolean isDebugMode = TikTokBusinessSdk.isInSdkDebugMode() || TikTokBusinessSdk.isEnableDebugMode();
 
         try {
@@ -175,17 +174,8 @@ class TTRequestBuilder {
     }
 
     private static JSONObject contextBuilder(@Nullable TTIdentifierFactory.AdIdInfo adIdInfo, boolean isDDL) {
-        JSONObject app = JSON.build();
+        JSONObject app = TTRequest.getAppInfo();
         try {
-            if (TikTokBusinessSdk.bothIdsProvided()) {
-                JSON.putObject(app, "id", TikTokBusinessSdk.getAppId());
-            }
-            JSON.putObject(app, "name", SystemInfoUtil.getAppName());
-            JSON.putObject(app, "namespace", SystemInfoUtil.getPackageName());
-            JSON.putObject(app, "version", SystemInfoUtil.getAppVersionName());
-            JSON.putObject(app, "build", SystemInfoUtil.getAppVersionCode() + "");
-            JSON.putObject(app, "tiktok_app_id", TikTokBusinessSdk.getTTAppId());
-            JSON.putObject(app, "app_session_id", SystemInfoUtil.getAppSessionId());
             JSON.putObject(app, "anonymous_id", TTUserInfo.sharedInstance.anonymousId);
         } catch (Throwable ignore) {
         }

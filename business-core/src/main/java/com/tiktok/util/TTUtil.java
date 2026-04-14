@@ -105,6 +105,7 @@ public class TTUtil {
     public static JSONObject getMetaException(@Nullable Throwable ex, @Nullable Long ts, int type) {
         JSONObject meta = getMetaWithTS(ts);
         try {
+            JSON.putObject(meta, "ex_sdk_version", SystemInfoUtil.getSDKVersion());
             if (ex != null) {
                 Throwable rootCause = ex;
                 while (rootCause.getCause() != null && rootCause.getCause() != rootCause)
