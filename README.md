@@ -30,4 +30,6 @@ For developer details including integration instructions, see [TikTok App Events
 
 ## Documentation
 - Developer documentation is available in the [TikTok for Business Developers](https://business-api.tiktok.com/portal/docs?id=1739584951798785) portal.
-- Marketing user documentation is available in the [TikTok for Business Help Center](https://ads.tiktok.com/help/article/how-to-integrate-tiktok-app-events-sdk). 
+- Marketing user documentation is available in the [TikTok for Business Help Center](https://ads.tiktok.com/help/article/how-to-integrate-tiktok-app-events-sdk).
+
+<!-- release-automation sandbox test: 0.0.1-test --> 
