@@ -33,3 +33,5 @@ For developer details including integration instructions, see [TikTok App Events
 - Marketing user documentation is available in the [TikTok for Business Help Center](https://ads.tiktok.com/help/article/how-to-integrate-tiktok-app-events-sdk).
 
 <!-- release-automation sandbox test: 0.0.1-test --> 
+
+<!-- release-automation e2e: v0.0.4-bottest @ 2026-07-08T13:08:19Z -->
