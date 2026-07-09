@@ -35,3 +35,5 @@ For developer details including integration instructions, see [TikTok App Events
 <!-- release-automation sandbox test: 0.0.1-test --> 
 
 <!-- release-automation e2e: v0.0.4-bottest @ 2026-07-08T13:08:19Z -->
+
+<!-- release-automation e2e: v0.0.5-test @ 2026-07-09T02:29:58Z -->
