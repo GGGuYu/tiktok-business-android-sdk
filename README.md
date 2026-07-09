@@ -1,24 +1,24 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.7-test
+- **Latest:** 0.0.8-test
 - Previous published tags (test): 0.0.6-bottest, 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
 
-### Changes in 0.0.7-test
-- Minor housekeeping: add CHANGELOG note file under business-core
-- Bump VERSION_NAME to 0.0.7-test
+### Changes in 0.0.8-test
+- Housekeeping release used to exercise skill resume flow (state B)
+- Bump VERSION_NAME to 0.0.8-test
 
 <!-- release-log-end -->
 
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.7-test
+- **Latest:** 0.0.8-test
 - Previous published tags (test): 0.0.6-bottest, 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
 
-### Changes in 0.0.7-test
-- Minor housekeeping: add CHANGELOG note file under business-core
-- Bump VERSION_NAME to 0.0.7-test
+### Changes in 0.0.8-test
+- Housekeeping release used to exercise skill resume flow (state B)
+- Bump VERSION_NAME to 0.0.8-test
 
 <!-- release-log-end -->
 
