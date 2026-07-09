@@ -1,3 +1,11 @@
+<!-- release-log-start -->
+## Release Log (test fork)
+
+- **Latest:** 0.0.6-bottest
+- Previous: 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
+
+<!-- release-log-end -->
+
 > [!IMPORTANT]
 > Use of the TikTok App Events SDK is governed by the [TikTok For Business Commercial Terms of Service](https://ads.tiktok.com/i18n/official/policy/commercial-terms-of-service). By using the TikTok App Events SDK, you also agree to the [TikTok Business Products (Data) Terms](https://ads.tiktok.com/i18n/official/policy/business-products-terms) and that you will not share sensitive data with TikTok.
 
