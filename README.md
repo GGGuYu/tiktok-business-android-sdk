@@ -1,6 +1,14 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
+- **Latest:** 0.0.6-test
+- Previous published tags (test): 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
+
+<!-- release-log-end -->
+
+<!-- release-log-start -->
+## Release Log (test fork)
+
 - **Latest:** 0.0.6-bottest
 - Previous: 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
 
