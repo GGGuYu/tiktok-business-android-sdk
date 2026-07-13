@@ -1,14 +1,15 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.10-bottest
-- Purpose: colleague-machine smoke test with refreshed GitHub-synced code.
+- **Latest:** 0.0.11-bottest
+- Purpose: skill v2 (iOS 双产物) smoke test.
 
-### Changes in 0.0.10-bottest
-- Bump VERSION_NAME to 0.0.10-bottest
+### Changes in 0.0.11-bottest
+- Bump VERSION_NAME to 0.0.11-bottest
 - Refresh README release note for another full A-state release test.
 
 <!-- release-log-end -->
+
 
 
 
