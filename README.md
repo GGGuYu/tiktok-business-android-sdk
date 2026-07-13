@@ -1,14 +1,15 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.9-bottest
-- Purpose: fresh cross-machine skill validation for Android fork.
+- **Latest:** 0.0.10-bottest
+- Purpose: colleague-machine smoke test with refreshed GitHub-synced code.
 
-### Changes in 0.0.9-bottest
-- Bump VERSION_NAME to 0.0.9-bottest
-- Touch README so the fork clearly has GitHub-synced test code.
+### Changes in 0.0.10-bottest
+- Bump VERSION_NAME to 0.0.10-bottest
+- Refresh README release note for another full A-state release test.
 
 <!-- release-log-end -->
+
 
 
 
