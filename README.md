@@ -1,26 +1,16 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.8-test
-- Previous published tags (test): 0.0.6-bottest, 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
+- **Latest:** 0.0.9-bottest
+- Purpose: fresh cross-machine skill validation for Android fork.
 
-### Changes in 0.0.8-test
-- Housekeeping release used to exercise skill resume flow (state B)
-- Bump VERSION_NAME to 0.0.8-test
-
-<!-- release-log-end -->
-
-<!-- release-log-start -->
-## Release Log (test fork)
-
-- **Latest:** 0.0.8-test
-- Previous published tags (test): 0.0.6-bottest, 0.0.5-bottest, 0.0.4-bottest, 0.0.3-bottest
-
-### Changes in 0.0.8-test
-- Housekeeping release used to exercise skill resume flow (state B)
-- Bump VERSION_NAME to 0.0.8-test
+### Changes in 0.0.9-bottest
+- Bump VERSION_NAME to 0.0.9-bottest
+- Touch README so the fork clearly has GitHub-synced test code.
 
 <!-- release-log-end -->
+
+
 
 > [!IMPORTANT]
 > Use of the TikTok App Events SDK is governed by the [TikTok For Business Commercial Terms of Service](https://ads.tiktok.com/i18n/official/policy/commercial-terms-of-service). By using the TikTok App Events SDK, you also agree to the [TikTok Business Products (Data) Terms](https://ads.tiktok.com/i18n/official/policy/business-products-terms) and that you will not share sensitive data with TikTok.
