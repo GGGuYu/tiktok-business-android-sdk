@@ -1,20 +1,12 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.16-bottest
-- Purpose: 新 skill + 全新 tag 隔离验证（第二次）.
+- **Latest:** 0.0.17-bottest
+- Purpose: 旧 skill 对照测试续.
 
-### Changes in 0.0.16-bottest
-- Bump VERSION_NAME to 0.0.16-bottest
-- Second isolated new-skill smoke test.
-
-### Changes in 0.0.15-bottest
-- Bump VERSION_NAME to 0.0.15-bottest
-- Isolated test: new skill against a JitPack-uncached tag.
-
-### Changes in 0.0.14-bottest
-- Bump VERSION_NAME to 0.0.14-bottest
-- Fake-sync for parity test with older skill version.
+### Changes in 0.0.17-bottest
+- Bump VERSION_NAME to 0.0.17-bottest
+- Fake-sync for older-skill parity re-test.
 
 <!-- release-log-end -->
 
