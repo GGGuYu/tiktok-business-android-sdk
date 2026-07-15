@@ -1,8 +1,12 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.13-bottest
-- Purpose: skill 阶段八/九 (default_branch 配置驱动) smoke test.
+- **Latest:** 0.0.14-bottest
+- Purpose: 用旧 skill 版本对照测试 (JitPack Maven Central 抖动排查).
+
+### Changes in 0.0.14-bottest
+- Bump VERSION_NAME to 0.0.14-bottest
+- Fake-sync for parity test with older skill version.
 
 ### Changes in 0.0.13-bottest
 - Bump VERSION_NAME to 0.0.13-bottest
@@ -11,10 +15,6 @@
 ### Changes in 0.0.12-bottest
 - Bump VERSION_NAME to 0.0.12-bottest
 - Fake-sync for post-fix skill regression test.
-
-### Changes in 0.0.11-bottest
-- Bump VERSION_NAME to 0.0.11-bottest
-- Refresh README release note for another full A-state release test.
 
 <!-- release-log-end -->
 
