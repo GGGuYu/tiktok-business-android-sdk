@@ -1,12 +1,12 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.17-bottest
-- Purpose: 旧 skill 对照测试续.
+- **Latest:** 0.0.18-bottest
+- Purpose: 又一版对照测试.
 
-### Changes in 0.0.17-bottest
-- Bump VERSION_NAME to 0.0.17-bottest
-- Fake-sync for older-skill parity re-test.
+### Changes in 0.0.18-bottest
+- Bump VERSION_NAME to 0.0.18-bottest
+- Fake-sync after user manual edits.
 
 <!-- release-log-end -->
 
