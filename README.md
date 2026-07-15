@@ -1,8 +1,12 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.12-bottest
-- Purpose: skill阶段八 review fix (状态机/iOS续跑/临时路径) smoke test.
+- **Latest:** 0.0.13-bottest
+- Purpose: skill 阶段八/九 (default_branch 配置驱动) smoke test.
+
+### Changes in 0.0.13-bottest
+- Bump VERSION_NAME to 0.0.13-bottest
+- Fake-sync for post-fix skill regression test (config-driven default branch).
 
 ### Changes in 0.0.12-bottest
 - Bump VERSION_NAME to 0.0.12-bottest
