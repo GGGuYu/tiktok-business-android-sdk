@@ -1,8 +1,12 @@
 <!-- release-log-start -->
 ## Release Log (test fork)
 
-- **Latest:** 0.0.14-bottest
-- Purpose: 用旧 skill 版本对照测试 (JitPack Maven Central 抖动排查).
+- **Latest:** 0.0.15-bottest
+- Purpose: 新 skill + 全新 tag 单独验证（避开 JitPack 对 0.0.13 的失败缓存）.
+
+### Changes in 0.0.15-bottest
+- Bump VERSION_NAME to 0.0.15-bottest
+- Isolated test: new skill against a JitPack-uncached tag.
 
 ### Changes in 0.0.14-bottest
 - Bump VERSION_NAME to 0.0.14-bottest
@@ -11,10 +15,6 @@
 ### Changes in 0.0.13-bottest
 - Bump VERSION_NAME to 0.0.13-bottest
 - Fake-sync for post-fix skill regression test (config-driven default branch).
-
-### Changes in 0.0.12-bottest
-- Bump VERSION_NAME to 0.0.12-bottest
-- Fake-sync for post-fix skill regression test.
 
 <!-- release-log-end -->
 
